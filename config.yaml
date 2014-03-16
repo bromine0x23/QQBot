@@ -1,0 +1,17 @@
+---
+common:
+  log_file: qqbot.log
+  captcha_file: captcha.jpg
+  qq: ''
+  password: 
+  bot_name: 
+  masters:
+  - 
+font:
+  name: 微软雅黑
+  size: 12
+  color: '000000'
+  bold: 0
+  italic: 0
+  underline: 0
+

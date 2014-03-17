@@ -10,7 +10,7 @@ require 'uri'
 
 class PluginEVE < PluginNicknameResponserBase
 	NAME = 'EVE插件'
-	AUTHOR = 'Bromine'
+	AUTHOR = 'BR'
 	VERSION = '1.2'
 	DESCRIPTION = '我们的征途的星辰大海'
 	MANUAL = <<MANUAL

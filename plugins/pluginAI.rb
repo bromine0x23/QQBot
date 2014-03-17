@@ -7,7 +7,7 @@ require 'sqlite3'
 
 class PluginAI < PluginNicknameResponserBase
 	NAME = 'AI插件'
-	AUTHOR = 'Bromine'
+	AUTHOR = 'BR'
 	VERSION = '1.4'
 	DESCRIPTION = '人家才不是AI呢'
 	MANUAL = <<MANUAL

@@ -3,7 +3,7 @@
 
 class PluginBase
 	NAME = '插件基类'
-	AUTHOR = 'Bromine'
+	AUTHOR = 'BR'
 	VERSION = '0.0'
 	DESCRIPTION = '用于派生其他插件'
 	MANUAL = <<MANUAL

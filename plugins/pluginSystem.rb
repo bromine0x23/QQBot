@@ -5,7 +5,7 @@ require_relative 'plugin'
 
 class PluginSystem < PluginNicknameResponserBase
 	NAME = '管理员插件'
-	AUTHOR = 'Bromine'
+	AUTHOR = 'BR'
 	VERSION = '1.9'
 	DESCRIPTION = '管理QQBot'
 	MANUAL = <<MANUAL
@@ -44,6 +44,8 @@ MANUAL
 	COMMAND_RELOAD_CONFIG        = '重载配置'
 	COMMAND_RELOAD_PLUGINS       = '重载插件'
 	COMMAND_START_GC             = '垃圾回收'
+	COMMAND_START_DEBUG          = '开始调试'
+	COMMAND_END_DEBUG            = '结束调试'
 	COMMAND_HELP                 = '插件帮助'
 	COMMAND_ENABLE_PLUGIN        = '启用插件'
 	COMMAND_DISABLE_PLUGIN       = '停用插件'
@@ -51,12 +53,16 @@ MANUAL
 	NO_PERMISSION_RELOAD_CONFIG  = '重载配置：权限不足'
 	NO_PERMISSION_RELOAD_PLUGINS = '重载插件：权限不足'
 	NO_PERMISSION_START_GC       = '垃圾回收：权限不足'
+	NO_PERMISSION_START_DEBUG    = '开始调试：权限不足'
+	NO_PERMISSION_END_DEBUG      = '结束调试：权限不足'
 	NO_PERMISSION_ENABLE_PLUGIN  = '启用插件：权限不足'
 	NO_PERMISSION_DISABLE_PLUGIN = '停用插件：权限不足'
 
 	RESPONSE_CONFIG_RELOADED  = '配置已重载'
 	RESPONSE_PLUGINS_RELOADED = '插件已重载，共 %d 个插件'
 	RESPONSE_GC_FINISHED      = '垃圾回收运行完毕，已执行 %d 次'
+	RESPONSE_DEBUG_STARTED    = '调试开始'
+	RESPONSE_DEBUG_ENDED      = '调试结束'
 	RESPONSE_PLUGIN_ENABLED   = '插件 %s 已启用'
 	RESPONSE_PLUGIN_DISABLED  = '插件 %s 已停用'
 	RESPONSE_UNKNOWN_PLUGIN   = '未知插件 %s'
@@ -99,6 +105,20 @@ RESPONSE
 				RESPONSE_GC_FINISHED % GC.count
 			else
 				NO_PERMISSION_START_GC
+			end
+		when COMMAND_START_DEBUG
+			if @qqbot.master? sender_qq
+				$-d = true
+				RESPONSE_DEBUG_STARTED
+			else
+				NO_PERMISSION_START_DEBUG
+			end
+		when COMMAND_END_DEBUG
+			if @qqbot.master? sender_qq
+				$-d = false
+				RESPONSE_DEBUG_ENDED
+			else
+				NO_PERMISSION_END_DEBUG
 			end
 		else
 			if COMMAND_PATTERN =~ message

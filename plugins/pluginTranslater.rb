@@ -9,7 +9,7 @@ require 'uri'
 
 class PluginTranslater < PluginNicknameResponserBase
 	NAME = '翻译插件'
-	AUTHOR = 'Bromine'
+	AUTHOR = 'BR'
 	VERSION = '1.4'
 	DESCRIPTION = 'My English is very good.'
 	MANUAL = <<MANUAL

@@ -5,7 +5,7 @@ require_relative 'plugin'
 
 class PluginWeather < PluginNicknameResponserBase
 	NAME = '天气插件'
-	AUTHOR = 'Bromine'
+	AUTHOR = 'BR'
 	VERSION = '1.0'
 	DESCRIPTION = '天气查询'
 	MANUAL = <<MANUAL

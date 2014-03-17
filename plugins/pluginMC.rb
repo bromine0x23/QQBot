@@ -5,7 +5,7 @@ require_relative 'plugin'
 
 class PluginMC < PluginNicknameResponserBase
 	NAME = 'MC插件'
-	AUTHOR = 'Bromine'
+	AUTHOR = 'BR'
 	VERSION = '1.2'
 	DESCRIPTION = 'MC合成表查询'
 	MANUAL = <<MANUAL

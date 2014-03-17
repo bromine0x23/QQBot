@@ -3,6 +3,10 @@
 
 require_relative 'plugin'
 
+=begin
+使用了LBS开放平台API
+参见：http://developer.baidu.com/map/carapi-7.htm
+=end
 class PluginWeather < PluginNicknameResponserBase
 	NAME = '天气插件'
 	AUTHOR = 'BR'
@@ -13,7 +17,7 @@ class PluginWeather < PluginNicknameResponserBase
 MANUAL
 	PRIORITY = 0
 
-	URI_FORMAT = 'http://api.map.baidu.com/telematics/v3/weather?location=%s&output=json&ak=TnChRGR56PhGC0mjA1rG0ueG'
+	URI_FORMAT = 'http://api.map.baidu.com/telematics/v3/weather?location=%s&output=json&ak=<ak>'
 
 	COMMAND_PATTERN = /^天气\s*(?<city>.+)$/
 

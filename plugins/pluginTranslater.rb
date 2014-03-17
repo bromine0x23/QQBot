@@ -7,6 +7,10 @@ require 'json'
 require 'net/http'
 require 'uri'
 
+=begin
+使用了有道翻译API
+参见 http://fanyi.youdao.com/openapi
+=end
 class PluginTranslater < PluginNicknameResponserBase
 	NAME = '翻译插件'
 	AUTHOR = 'BR'
@@ -19,8 +23,7 @@ MANUAL
 	PRIORITY = 0
 
 	URI_FORMAT = [
-		'http://fanyi.youdao.com/openapi.do?keyfrom=bakachu&key=340119877&type=data&doctype=json&version=1.1&q=%s',
-		'http://fanyi.youdao.com/openapi.do?keyfrom=Idol-CHU&key=211173787&type=data&doctype=json&version=1.1&q=%s'
+		'http://fanyi.youdao.com/openapi.do?keyfrom=<keyfrom>key=<key>&type=data&doctype=json&version=1.1&q=%s',
 	]
 
 	COMMAND_PATTERN = /^翻译\s*(?<text>.+)$/

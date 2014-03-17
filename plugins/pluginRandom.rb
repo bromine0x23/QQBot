@@ -15,7 +15,7 @@ MANUAL
 	PRIORITY = 0
 
 	COMMAND_DICE = '掷骰子'
-	COMMAND_CHOOSE = /^(?<act>.+)还是不\k<act>/
+	COMMAND_CHOOSE = /^(?<act>.+?)(还是)?不\k<act>/
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		super

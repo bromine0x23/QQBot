@@ -9,6 +9,9 @@ require 'webrick/cookie'
 module Util
 	# Cookie处理辅助类
 	class Cookie
+		SEPARATOR = '; '
+		FORMAT = '%s=%s'
+
 		def initialize
 			@cookies = {}
 		end
@@ -19,9 +22,7 @@ module Util
 				cookie.expires and cookie.expires < Time.now
 			end
 			WEBrick::Cookie.parse_set_cookies(str).each do |cookie|
-				if not cookie.expires or cookie.expires > Time.now
-					@cookies[cookie.name] = cookie
-				end
+				@cookies[cookie.name] = cookie if not cookie.expires or cookie.expires > Time.now
 			end
 		end
 
@@ -34,12 +35,18 @@ module Util
 		end
 
 		def to_s
-			@cookies.values.map{|cookie| "#{cookie.name}=#{cookie.value}"}.join('; ')
+			@cookies.values.map{|cookie| FORMAT % [cookie.name, cookie.value]}.join(SEPARATOR)
 		end
 	end
 
 	# 网络通信辅助类
 	class NetHelper
+		KEY_COOKIE = 'Cookie'
+		KEY_SET_COOKIE = 'Set-Cookie'
+		DEFAULT_PATH = '/'
+		DEFAULT_QUERIES = {}
+		SCHEME_HTTPS = 'https'
+
 		attr_reader :header, :cookies
 
 		def initialize(logger)
@@ -59,26 +66,26 @@ module Util
 		end
 
 		def get(uri)
-			debug("HTTP GET: #{uri}")
-			Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https', verify_mode: OpenSSL::SSL::VERIFY_NONE) do |http|
-				@header['Cookie'] = @cookies.to_s
+			log("HTTP GET: #{uri}", Logger::DEBUG) if $-d
+			Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == SCHEME_HTTPS, verify_mode: OpenSSL::SSL::VERIFY_NONE) do |http|
+				@header[KEY_COOKIE] = @cookies.to_s
 				response = http.request(Net::HTTP::Get.new(uri, @header))
-				@cookies.update(response['Set-Cookie']) if response['Set-Cookie']
+				@cookies.update(response[KEY_SET_COOKIE]) if response[KEY_SET_COOKIE]
 				return response.body
 			end
 		end
 
 		def post(uri, data)
-			debug("HTTP POST: #{uri}")
-			Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https', verify_mode: OpenSSL::SSL::VERIFY_NONE) do |http|
-				@header['Cookie'] = @cookies.to_s
+			log("HTTP POST: #{uri}", Logger::DEBUG) if $-d
+			Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == SCHEME_HTTPS, verify_mode: OpenSSL::SSL::VERIFY_NONE) do |http|
+				@header[KEY_COOKIE] = @cookies.to_s
 				response = http.request(Net::HTTP::Post.new(uri, @header), data)
-				@cookies.update(response['Set-Cookie']) if response['Set-Cookie']
+				@cookies.update(response[KEY_SET_COOKIE]) if response[KEY_SET_COOKIE]
 				return response.body
 			end
 		end
 
-		def self.uri_https(host, path = '/', queries = {})
+		def self.uri_https(host, path = DEFAULT_PATH, queries = DEFAULT_QUERIES)
 			URI::HTTPS.build(
 				host: host,
 				path: path,
@@ -86,7 +93,7 @@ module Util
 			)
 		end
 
-		def self.uri_http(host, path = '/', queries = {})
+		def self.uri_http(host, path = DEFAULT_PATH, queries = DEFAULT_QUERIES)
 			URI::HTTP.build(
 				host: host,
 				path: path,
@@ -94,7 +101,7 @@ module Util
 			)
 		end
 
-		def uri_https(host, path = '/', queries = {})
+		def uri_https(host, path = DEFAULT_PATH, queries = DEFAULT_QUERIES)
 			URI::HTTPS.build(
 				host: host,
 				path: path,
@@ -102,7 +109,7 @@ module Util
 			)
 		end
 
-		def uri_http(host, path = '/', queries = {})
+		def uri_http(host, path = DEFAULT_PATH, queries = DEFAULT_QUERIES)
 			URI::HTTP.build(
 				host: host,
 				path: path,
@@ -113,11 +120,7 @@ module Util
 		private
 
 		def log(message, level = Logger::INFO)
-			@logger.log(level, message, 'Util::NetHelper')
-		end
-
-		def debug(message)
-			log(message, Logger::DEBUG) if $DEBUG
+			@logger.log(level, message, self.class.name)
 		end
 	end
 end

@@ -6,7 +6,7 @@ require_relative 'plugin'
 class PluginCalender < PluginNicknameResponserBase
 	NAME = '运势插件'
 	AUTHOR = 'BR'
-	VERSION = '1.0'
+	VERSION = '1.3'
 	DESCRIPTION = '今日不宜：现充'
 	MANUAL = <<MANUAL
 我的运势
@@ -58,7 +58,8 @@ MANUAL
 	STR_NUM   = '一二三四五六七八九十'
 	STR_MONTH = '正二三四五六七八九十冬腊'
 	STR_WEEK  = '日一二三四五六'
-	STR_DAY = %w(初一 初二 初三 初四 初五 初六 初七 初八 初九 初十 十一 十二 十三 十四 十五 十六 十七 十八 十九 廿 二十一 二十二 二十三 二十四 二十五 二十六 二十七 二十八 二十九 三十 三十一 三十二 三十三 三十四 三十五 三十六 三十七 三十八 三十九 四十)
+	STR_DAYS = %w(〇 初一 初二 初三 初四 初五 初六 初七 初八 初九 初十 十一 十二 十三 十四 十五 十六 十七 十八 十九 廿 二十一 二十二 二十三 二十四 二十五 二十六 二十七 二十八 二十九 三十 三十一 三十二 三十三 三十四 三十五 三十六 三十七 三十八 三十九 四十)
+	STR_FORTUNE_LEVELS = %w(大凶 凶 凶 凶 末吉 末吉 末吉 末吉 末吉 末吉 半吉 半吉 吉 吉 小吉 小吉 中吉 中吉 大吉 大吉)
 
 	SZ_STR_TG    = STR_TG.size
 	SZ_STR_DZ    = STR_DZ.size
@@ -113,7 +114,7 @@ RESPONSE
 		elsif message == COMMAND_CALENDER
 			date = Time.now
 			seed = get_seed(date)
-			@things = THINGS
+			@things = THINGS.clone
 			good_things = get_good_things(seed)
 			bad_things = get_bad_things(seed)
 			<<RESPONSE
@@ -175,40 +176,21 @@ STRING
 		end
 
 		<<DATE
-#{STR_TG[(year-4)%SZ_STR_TG]}#{STR_DZ[(year-4)%SZ_STR_DZ]}#{STR_SX[(year-4)%SZ_STR_SX]}年#{month < 1 ? "闰#{STR_MONTH[-month-1]}" : STR_MONTH[month-1]}月#{STR_DAY[day]}
+#{STR_TG[(year-4)%SZ_STR_TG]}#{STR_DZ[(year-4)%SZ_STR_DZ]}#{STR_SX[(year-4)%SZ_STR_SX]}年#{month < 1 ? "闰#{STR_MONTH[-month-1]}" : STR_MONTH[month-1]}月#{STR_DAYS[day]}
 DATE
 	end
 
 	def get_level(seed, qq)
 		point = random(seed * qq, 6) % 100
-		level = case point
-				when 0...5
-					'大凶'
-				when 5...20
-					'凶'
-				when 20...50
-					'末吉'
-				when 50...60
-					'半吉'
-				when 60...70
-					'吉'
-				when 70...80
-					'小吉'
-				when 80...90
-					'中吉'
-				else
-					'大吉'
-				end
-		"#{level}(#{point})"
+		"#{STR_FORTUNE_LEVELS[point / 5]}(#{point})"
 	end
 
 	def get_good_things(seed)
 		good_things = []
 		sg = random(seed, 8) % 100
 		(random(seed, 9) % 3 + 1).times do
-			n = (sg * 0.01 * @things.size).to_i
-			good_things << @things[n]
-			@things.delete_at(n)
+			good_things << @things.delete_at((sg * 0.01 * @things.size).to_i)
+
 		end
 		good_things
 	end
@@ -217,9 +199,7 @@ DATE
 		bad_things = []
 		sb = random(seed, 4) % 100
 		(random(seed, 7) % 3 + 1).times do
-			n = (sb * 0.01 * @things.size).to_i
-			bad_things << @things[n]
-			@things.delete_at(n)
+			bad_things << @things.delete_at((sb * 0.01 * @things.size).to_i)
 		end
 		bad_things
 	end

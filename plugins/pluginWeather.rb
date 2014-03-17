@@ -29,14 +29,17 @@ MANUAL
 	RESPONSE_ERROR = '查询天气时遭遇错误，错误代码 %d'
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
+		super
 		if COMMAND_PATTERN =~ message
 			data = JSON.parse(Net::HTTP.get(URI(URI_FORMAT % URI.encode_www_form_component($~[:city]))))
 			if data[KEY_ERROR] == 0
 				response = ''
 				data[KEY_RESULTS].each do |result|
-					response += "#{result[KEY_CURRENT_CITY ]} 天气\n"
+					response << "#{result[KEY_CURRENT_CITY ]} 天气\n"
 					result[KEY_WEATHER_DATA].each do |weather_data|
-						response += "#{weather_data[KEY_DATE]}：#{weather_data[KEY_WEATHER]}，#{weather_data[KEY_TEMPERATURE]}，#{weather_data[KEY_WIND]}\n"
+						response << <<WEATHER
+#{weather_data[KEY_DATE]}：#{weather_data[KEY_WEATHER]}，#{weather_data[KEY_TEMPERATURE]}，#{weather_data[KEY_WIND]}
+WEATHER
 					end
 				end
 				response

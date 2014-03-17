@@ -9,10 +9,12 @@ require_relative 'webqq'
 
 class QQBot
 	CONFIG_FILE = 'config.yaml'
+	KEY_POLL_TYPE = 'poll_type'
+	KEY_VALUE = 'value'
+	KEY_FROM_UIN = 'from_uin'
 
 	attr_reader :bot_name
 	attr_reader :plugins
-	attr_reader :forbidden
 	attr_reader :groups
 	attr_reader :friends
 	attr_reader :masters
@@ -43,10 +45,9 @@ class QQBot
 				loop do
 					datas = @message_receiver.data
 					datas.each do |data|
-						debug("data: #{data}")
-						poll_type, value = data['poll_type'], data['value']
-						from_uin = value['from_uin']
-						send_uin = value['send_uin']
+						log("data: #{data}", Logger::DEBUG) if $-d
+						poll_type, value = data[KEY_POLL_TYPE], data[KEY_VALUE]
+						from_uin = value[KEY_FROM_UIN]
 						event = :"on_#{poll_type}"
 						@plugins.each do |plugin|
 							next if plugin_forbidden?(from_uin, plugin)
@@ -80,7 +81,7 @@ class QQBot
 			end
 		rescue Exception => ex
 			log(ex)
-			debug("调用栈：\n#{ex.backtrace.join("\n")}")
+			log("调用栈：\n#{ex.backtrace.join("\n")}")
 		ensure
 			log('测试登出……')
 			@client.logout
@@ -150,7 +151,7 @@ class QQBot
 	private
 
 	def log(message, level = Logger::INFO)
-		@logger.log(level, message, 'QQBot')
+		@logger.log(level, message, self.class.name)
 	end
 
 	def debug(message)
@@ -169,9 +170,11 @@ class QQBot
 		@font_config = config['font']
 	end
 
+	LOAD_PLUGINS_PATH = './plugins/plugin*.rb'
+
 	def load_plugins
 		log('载入插件……')
-		Dir.glob('./plugins/plugin*.rb') { |file_name| load file_name }
+		Dir.glob(LOAD_PLUGINS_PATH) { |file_name| load file_name }
 		@plugins = PluginBase.plugins
 		.map { |plugin_class|
 			begin

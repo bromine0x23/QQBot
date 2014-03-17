@@ -81,38 +81,48 @@ MANUAL
 	end
 
 	def on_message(value)
-		debug('message 消息')
+		log("message #{value}", Logger::DEBUG) if $-d
 		# 桩方法，处理 message 消息
 	end
 
 	def on_group_message(value)
-		debug('group_message 消息')
+		log("group_message #{value}", Logger::DEBUG) if $-d
 		# 桩方法，处理 group_message 事件
 	end
 
 	def on_input_notify(value)
-		debug('input_notify 消息')
+		log("input_notify #{value}")
 		# 桩方法，处理 input_notify 消息
 	end
 
 	def on_buddies_status_change(value)
-		debug('buddies_status_change 事件')
+		log("buddies_status_change #{value}")
 		# 桩方法，处理 buddies_status_change 消息
 	end
 
 	def on_sess_message(value)
-		debug('sess_message 消息')
+		log("sess_message #{value}")
 		# 桩方法，处理 sess_message 消息
 	end
 
 	def on_kick_message(value)
-		debug('kick_message 消息')
+		log("kick_message #{value}")
 		# 桩方法，处理 kick_message 消息
 	end
 
 	def on_group_web_message(value)
-		debug('group_web_message 消息')
+		log("group_web_message #{value}")
 		# 桩方法，处理 group_web_message 消息
+	end
+
+	def on_system_message(value)
+		log("system_message #{value}")
+		# 桩方法，处理 system_message 消息
+	end
+
+	def on_sys_g_msg(value)
+		log("sys_g_msg #{value}")
+		# 桩方法，处理 sys_g_msg 消息
 	end
 
 	protected
@@ -127,34 +137,40 @@ MANUAL
 
 	private
 
+	STR_BASE = 'Base'
+
 	def self.inherited(subclass)
-		@@plugins << subclass unless subclass.name.end_with? 'Base'
+		@@plugins << subclass unless subclass.name.end_with? STR_BASE
 	end
 end
 
 class PluginResponserBase < PluginBase
 	NAME = '消息回应插件基类'
 
+	KEY_FROM_UIN = 'from_uin'
+	KEY_SEND_UIN = 'send_uin'
+	KEY_CONTENT = 'content'
+	KEY_TIME = 'time'
+
 	def on_message(value)
 		super
-		uin = value['from_uin']
-		deal_message(uin, @qqbot.qq_number(uin), @qqbot.friend_nickname(uin), value['content'], Time.at(value['time']))
+		uin = value[KEY_FROM_UIN]
+		deal_message(uin, @qqbot.qq_number(uin), @qqbot.friend_nickname(uin), value[KEY_CONTENT], Time.at(value[KEY_TIME]))
 	end
 
 	def on_group_message(value)
 		super
-		guin = value['from_uin']
-		uin = value['send_uin']
-		deal_group_message(guin, @qqbot.qq_number(uin), @qqbot.group_nickname(guin, uin), value['content'], Time.at(value['time']))
+		guin, uin = value[KEY_FROM_UIN], value[KEY_SEND_UIN]
+		deal_group_message(guin, @qqbot.qq_number(uin), @qqbot.group_nickname(guin, uin), value[KEY_CONTENT], Time.at(value[KEY_TIME]))
 	end
 
 	def deal_message(uin, sender_qq, sender_nickname, content, time)
-		debug("来自#{sender_nickname}(#{sender_qq})的消息")
+		log("来自#{sender_nickname}(#{sender_qq})的消息", Logger::DEBUG) if $-d
 		# 桩方法，处理事件响应
 	end
 
 	def deal_group_message(guin, sender_qq, sender_nickname, content, time)
-		debug("来自#{sender_nickname}(#{sender_qq})的群消息")
+		log("来自#{sender_nickname}(#{sender_qq})的群消息", Logger::DEBUG) if $-d
 		# 桩方法，处理群事件响应
 	end
 end
@@ -183,7 +199,7 @@ class PluginNicknameResponserBase < PluginResponserBase
 	end
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
-		debug("处理指令：#{message}")
+		log("处理指令：#{message}", Logger::DEBUG) if $-d
 		# 桩方法，处理消息响应
 	end
 end

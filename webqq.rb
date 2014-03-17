@@ -85,8 +85,8 @@ class WebQQClient
 					r: random_key
 				)
 				need_verify, verify_code, key =net_helper.get(uri).scan(/'.*?'/).map{|str| str[1..-2]}
-				debug(logger, "是否需要验证码： #{need_verify}")
-				debug(logger, "密钥： #{key}")
+				log(logger, "是否需要验证码： #{need_verify}", Logger::DEBUG) if $-d
+				log(logger, "密钥： #{key}", Logger::DEBUG) if $-d
 
 				if need_verify != '0'
 					# 需要验证码
@@ -105,7 +105,7 @@ class WebQQClient
 				#加密密码
 				log(logger, '加密密码……')
 				password_encrypted = PasswordEncrypt.encrypt(password, verify_code, key)
-				debug(logger, "密码加密为：#{password_encrypted}")
+				log(logger, "密码加密为：#{password_encrypted}", Logger::DEBUG) if $-d
 
 				# 验证账号
 				log(logger, '验证账号……')
@@ -187,11 +187,7 @@ class WebQQClient
 		private
 
 		def self.log(logger, message, level = Logger::INFO)
-			logger.log(level, message, 'WebQQClient::Loginer')
-		end
-
-		def self.debug(logger, message)
-			log(logger, message, Logger::DEBUG) if $DEBUG
+			logger.log(level, message, self.name)
 		end
 
 		def self.get_session_data(net_helper, client_id, ptwebqq)
@@ -218,6 +214,8 @@ class WebQQClient
 	# 封装消息接收线程
 	class MessageReceiver
 		TIMEOUT = 120
+		KEY_RETCODE = 'retcode'
+		KEY_RESULT = 'result'
 
 		# 创建接收线程
 		def initialize(cookies, logger, client_id, p_session_id)
@@ -241,8 +239,8 @@ class WebQQClient
 					loop do
 						begin
 							json_data = JSON.parse(http.request(request).body)
-							raise ErrorCode.new(json_data['retcode'], json_data) unless json_data['retcode'] == 0
-							@messages.push json_data['result']
+							raise ErrorCode.new(json_data[KEY_RETCODE], json_data) unless json_data[KEY_RETCODE] == 0
+							@messages.push json_data[KEY_RESULT]
 						rescue WebQQClient::ErrorCode => ex
 							case ex.error_code
 							when 102, 116
@@ -272,16 +270,17 @@ class WebQQClient
 		private
 
 		def log(message, level = Logger::INFO)
-			@logger.log(level, message, 'WebQQClient::MessageReceiver')
-		end
-
-		def debug(message)
-			log(message, Logger::DEBUG) if $DEBUG
+			@logger.log(level, message, self.class.name)
 		end
 	end
 
 	# 封装消息发送线程
 	class MessageSender
+		KEY_RETCODE = 'retcode'
+		STRING_FONT = 'font'
+		DEFAULT_FONT_FACE = '宋体'
+		DEFAULT_COLOR = '000000'
+
 		# 创建发送线程
 		def initialize(cookies, logger, client_id1, p_session_id1)
 			@logger = logger
@@ -305,46 +304,51 @@ class WebQQClient
 					message_counter = Random.rand(1000...10000) * 10000
 					loop do
 						data = @messages.pop
-						case data[:type]
-						when :group_message
-							message_counter += 1
-							qun_request.set_form_data(
-								r: JSON.generate(
-									group_uin: data[:uin],
-									content: encode_content(data[:message], data[:font]),
-									msg_id: message_counter,
+						begin
+							case data[:type]
+							when :group_message
+								message_counter += 1
+								qun_request.set_form_data(
+									r: JSON.generate(
+										group_uin: data[:uin],
+										content: encode_content(data[:message], data[:font]),
+										msg_id: message_counter,
+										clientid: client_id,
+										psessionid: p_session_id
+									),
 									clientid: client_id,
 									psessionid: p_session_id
-								),
-								clientid: client_id,
-								psessionid: p_session_id
-							)
-							debug("HTTP POST #{qun_request.path}")
-							debug("BODY：#{qun_request.body}")
-							json_data = JSON.parse(https.request(qun_request).body)
-							debug("RESPONSE：#{json_data}")
-							raise ErrorCode.new(json_data['retcode'], json_data) unless json_data['retcode'] == 0
-						when :message
-							message_counter += 1
-							buddy_request.set_form_data(
-								r: JSON.generate(
-									to: data[:uin],
-									face: 0,
-									content: encode_content(data[:message], data[:font]),
-									msg_id: message_counter,
+								)
+								log("HTTP POST #{qun_request.path}", Logger::DEBUG) if $-d
+								log("BODY：#{qun_request.body}", Logger::DEBUG) if $-d
+								json_data = JSON.parse(https.request(qun_request).body)
+								log("RESPONSE：#{json_data}", Logger::DEBUG) if $-d
+								raise ErrorCode.new(json_data[KEY_RETCODE], json_data) unless json_data[KEY_RETCODE] == 0
+							when :message
+								message_counter += 1
+								buddy_request.set_form_data(
+									r: JSON.generate(
+										to: data[:uin],
+										face: 0,
+										content: encode_content(data[:message], data[:font]),
+										msg_id: message_counter,
+										clientid: client_id,
+										psessionid: p_session_id
+									),
 									clientid: client_id,
 									psessionid: p_session_id
-								),
-								clientid: client_id,
-								psessionid: p_session_id
-							)
-							debug("HTTP POST：#{buddy_request.path}")
-							debug("BODY：#{buddy_request.body}")
-							json_data = JSON.parse(https.request(buddy_request).body)
-							debug("RESPONSE：#{json_data}")
-							raise ErrorCode.new(json_data['retcode'], json_data) unless json_data['retcode'] == 0
-						else
-							next
+								)
+								log("HTTP POST：#{buddy_request.path}", Logger::DEBUG) if $-d
+								log("BODY：#{buddy_request.body}", Logger::DEBUG) if $-d
+								json_data = JSON.parse(https.request(buddy_request).body)
+								log("RESPONSE：#{json_data}", Logger::DEBUG) if $-d
+								raise ErrorCode.new(json_data[KEY_RETCODE], json_data) unless json_data[KEY_RETCODE] == 0
+							else
+								next
+							end
+						rescue EOFError
+							log('网络异常，无法发送消息，重试……')
+							retry
 						end
 					end
 				rescue Exception => ex
@@ -381,11 +385,7 @@ class WebQQClient
 		private
 
 		def log(message, level = Logger::INFO)
-			@logger.log(level, message, 'WebQQClient::MessageSender')
-		end
-
-		def debug(message)
-			log(message, Logger::DEBUG) if $DEBUG
+			@logger.log(level, message, self.class.name)
 		end
 
 		# 编码内容数据
@@ -395,16 +395,16 @@ class WebQQClient
 					message,
 					'',
 					[
-						'font',
+						STRING_FONT,
 						{
-							name: font[:name] || '宋体',
+							name: font[:name] || DEFAULT_FONT_FACE,
 							size: font[:size] || 10,
 							style: [
 								font[:bold] ? 1 : 0,
 								font[:italic] ? 1 : 0,
 								font[:underline] ? 1 : 0
 							],
-							color: font[:color] || '000000'
+							color: font[:color] || DEFAULT_COLOR
 						}
 					]
 				]
@@ -445,19 +445,25 @@ class WebQQClient
 	class QQGroup
 		attr_reader :uin, :group_code, :group_name, :group_number, :group_info
 
+		KEY_MINFO = 'minfo'
+		KEY_MUIN  = 'muin'
+		KEY_UIN   = 'uin'
+		KEY_NICK  = 'nick'
+		KEY_CARDS = 'cards'
+		KEY_CARD  = 'card'
+
 		# @param [WebQQClient] client
 		def initialize(client, uin, group_code, group_name)
 			@uin = uin
 			@group_code, @group_name = group_code, group_name
 			@group_number = client.fetch_group_number(group_code)
 			@group_info = client.fetch_group_info(group_code)
-
 			@group_nicknames = {}
-			@group_info['minfo'].each do |member|
-				@group_nicknames[member['uin']] = member['nick']
+			@group_info[KEY_MINFO].each do |member|
+				@group_nicknames[member[KEY_UIN]] = member[KEY_NICK]
 			end
-			@group_info['cards'].each do |card|
-				@group_nicknames[card['muin']] = card['card']
+			@group_info[KEY_CARDS].each do |card|
+				@group_nicknames[card[KEY_MUIN]] = card[KEY_CARD]
 			end
 		end
 
@@ -525,12 +531,15 @@ class WebQQClient
 	end
 
 	def log(message, level = Logger::INFO)
-		@logger.log(level, message, 'WebQQClient')
+		@logger.log(level, message, self.class.name)
 	end
 
 	def debug(message)
 		log(message, Logger::DEBUG) if $DEBUG
 	end
+
+	KEY_RETCODE = 'retcode'
+	KEY_RESULT = 'result'
 
 	# HTTP POST 请求
 	def util_post_request(raw_data, uri)
@@ -539,18 +548,18 @@ class WebQQClient
 			clientid: @client_id,
 			psessionid: @p_session_id
 		)
-		@net_helper.add_header('Content-Type', 'application/x-www-form-urlencoded')
+		# @net_helper.add_header('Content-Type', 'application/x-www-form-urlencoded')
 		json_data = JSON.parse(@net_helper.post(uri, data))
-		@net_helper.delete_header('Content-Type')
-		raise ErrorCode.new(json_data['retcode'], json_data) unless json_data['retcode'] == 0
-		debug("response data: #{json_data['result']}")
-		json_data['result']
+		# @net_helper.delete_header('Content-Type')
+		raise ErrorCode.new(json_data[KEY_RETCODE], json_data) unless json_data[KEY_RETCODE] == 0
+		log("response data: #{json_data[KEY_RESULT]}", Logger::DEBUG) if $-d
+		json_data[KEY_RESULT]
 	end
 
 	# HTTP GET 请求，返回解析后的 json 数据
 	def util_get_json_data(uri)
 		json_data = JSON.parse(@net_helper.get(uri))
-		raise ErrorCode.new(json_data['retcode'], json_data) unless json_data['retcode'] == 0
+		raise ErrorCode.new(json_data[KEY_RETCODE], json_data) unless json_data[KEY_RETCODE] == 0
 		json_data
 	end
 
@@ -578,7 +587,7 @@ class WebQQClient
 			'/api/get_group_name_list_mask2'
 		)
 		json_data = self.util_post_request(raw_data, uri)
-		debug("json_data = #{json_data}")
+		log("json_data = #{json_data}", Logger::DEBUG) if $-d
 		json_data['gnamelist'].map do |group|
 			QQGroup.new(self, group['gid'], group['code'], group['name'])
 		end

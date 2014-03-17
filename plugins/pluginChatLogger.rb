@@ -7,7 +7,7 @@ require 'logger'
 
 class PluginChatLogger < PluginResponserBase
 	NAME = '消息记录插件'
-	AUTHOR = 'Bromine'
+	AUTHOR = 'BR'
 	VERSION = '1.0'
 	DESCRIPTION = '记记记记记'
 	MANUAL = <<MANUAL

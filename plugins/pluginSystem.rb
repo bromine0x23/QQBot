@@ -17,7 +17,7 @@ class PluginSystem < PluginNicknameResponserBase
 == 显示插件优先级 ==
 插件优先级
 == 显示插件帮助 ==
-帮助 <插件>
+插件帮助 <插件>
 MANUAL
 =begin
 == [插件管理员]启用插件 ==
@@ -36,7 +36,7 @@ MANUAL
 =end
 	PRIORITY = 8
 
-	COMMAND_PATTERN = /(?<command>插件帮助|开启插件|关闭插件)\s*(?<plugin_name>.+)/
+	COMMAND_PATTERN = /(?<command>插件帮助|启用插件|停用插件)\s*(?<plugin_name>.+)/
 
 	COMMAND_LIST_MASTERS         = '权限狗列表'
 	COMMAND_LIST_PLUGINS         = '插件列表'
@@ -66,6 +66,10 @@ MANUAL
 	RESPONSE_PLUGIN_ENABLED   = '插件 %s 已启用'
 	RESPONSE_PLUGIN_DISABLED  = '插件 %s 已停用'
 	RESPONSE_UNKNOWN_PLUGIN   = '未知插件 %s'
+	RESPONSE_PLUGIN_HELP      = <<RESPONSE
+==> %s 帮助 <==
+%s
+RESPONSE
 
 	STRING_EMPTY = '空'
 
@@ -127,10 +131,7 @@ RESPONSE
 				if plugin
 					case $~[:command]
 					when COMMAND_HELP
-						<<RESPONSE
-==> #{plugin_name}帮助 <==
-#{plugin.manual.strip}
-RESPONSE
+						RESPONSE_PLUGIN_HELP % [plugin_name, plugin.manual.strip]
 					when COMMAND_ENABLE_PLUGIN
 						if @qqbot.master?(sender_qq)
 							@qqbot.enable_plugin(uin, plugin)

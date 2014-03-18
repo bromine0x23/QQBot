@@ -5,15 +5,51 @@ require 'thread'
 require 'json'
 require 'logger'
 require 'uri'
+require 'net/http'
 require 'net/https'
 require_relative 'util'
 
 # WebQQ客户端
 class WebQQClient
-	USER_AGENT = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/33.0.1750.146 Safari/537.36'
 	APPID = 1003903
 	JS_VER = 10071
 	JS_TYPE = 0
+	LOGIN_SIG = 'EDCv9dZdzXo5FchLpEEgEk-coa77jI5yM8L7rEhPWJCYGQlEMBdf5fRmccPqtHKt'
+
+	HOST_SSL_PTLOGIN2_QQ = 'ssl.ptlogin2.qq.com'
+	HOST_D_WEB2_QQ       = 'd.web2.qq.com'
+	HOST_S_WEB2_QQ       = 's.web2.qq.com'
+
+	JSON_KEY_ACCOUNT    = 'account'
+	JSON_KEY_CARD       = 'card'
+	JSON_KEY_CARDS      = 'cards'
+	JSON_KEY_CODE       = 'code'
+	JSON_KEY_FRIENDS    = 'friends'
+	JSON_KEY_GID        = 'gid'
+	JSON_KEY_GNAMELIST  = 'gnamelist'
+	JSON_KEY_INFO       = 'info'
+	JSON_KEY_MARKNAME   = 'markname'
+	JSON_KEY_MARKNAMES  = 'marknames'
+	JSON_KEY_MINFO      = 'minfo'
+	JSON_KEY_MUIN       = 'muin'
+	JSON_KEY_NAME       = 'name'
+	JSON_KEY_NICK       = 'nick'
+	JSON_KEY_PSESSIONID = 'psessionid'
+	JSON_KEY_RETCODE    = 'retcode'
+	JSON_KEY_RESULT     = 'result'
+	JSON_KEY_TUIN       = 'tuin'
+	JSON_KEY_UIN        = 'uin'
+	JSON_KEY_VFWEBQQ    = 'vfwebqq'
+
+
+	COOKIE_KEY_PTWEBQQ = 'ptwebqq'
+
+	HEADER_KEY_USER_AGENT = 'User-Agent'
+	HEADER_KEY_COOKIE     = 'Cookie'
+	HEADER_KEY_REFERER    = 'Referer'
+
+	HEADER_USER_AGENT = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/33.0.1750.146 Safari/537.36'
+	HEADER_REFERER    = 'https://d.web2.qq.com/cfproxy.html?v=20110331002&callback=1'
 
 	# 异常类：WebQQ通信错误码
 	class ErrorCode < Exception
@@ -67,36 +103,41 @@ class WebQQClient
 		# @param [Util::NetHelper] net_helper
 		# @param [Logger] logger
 		def self.login(qq, password, net_helper, logger, on_captcha_need)
-			client_id  = Random.rand(10000000...100000000) # 客户端id
-			random_key = Random.rand
-			uri = nil
+			random_key, client_id  = Random.rand, Random.rand(10000000...100000000) # 客户端id
+			nickname, uin, ptwebqq = nil, nil, nil
+			p_session_id, verify_webqq = nil, nil
+
 			begin
 				# 第一次握手
 				log(logger, '拉取验证信息……')
-				uri = Util::NetHelper.uri_https(
-					'ssl.ptlogin2.qq.com',
-					'/check',
-					uin: qq,
-					appid: APPID,
-					js_ver: JS_VER,
-					js_type: JS_TYPE,
-					login_sig: 'EDCv9dZdzXo5FchLpEEgEk-coa77jI5yM8L7rEhPWJCYGQlEMBdf5fRmccPqtHKt',
-					u1: 'http://web2.qq.com/loginproxy.html',
-					r: random_key
+				uri = URI::HTTPS.build(
+					host: HOST_SSL_PTLOGIN2_QQ,
+					path: '/check',
+					query: URI.encode_www_form(
+						uin: qq,
+						appid: APPID,
+						js_ver: JS_VER,
+						js_type: JS_TYPE,
+						login_sig: LOGIN_SIG,
+						u1: 'http://web2.qq.com/loginproxy.html',
+						r: random_key
+					)
 				)
-				need_verify, verify_code, key =net_helper.get(uri).scan(/'.*?'/).map{|str| str[1..-2]}
+				need_verify, verify_code, key = net_helper.get(uri).scan(/'.*?'/).map{|str| str[1..-2]}
 				log(logger, "是否需要验证码： #{need_verify}", Logger::DEBUG) if $-d
 				log(logger, "密钥： #{key}", Logger::DEBUG) if $-d
 
 				if need_verify != '0'
 					# 需要验证码
 					log(logger, '获取验证码……')
-					uri = Util::NetHelper.uri_https(
-						'ssl.captcha.qq.com',
-						'/getimage',
-						uin: qq,
-						aid: APPID,
-						r: random_key
+					uri = URI::HTTPS.build(
+						host: 'ssl.captcha.qq.com',
+						path: '/getimage',
+						query: URI.encode_www_form(
+							uin: qq,
+							aid: APPID,
+							r: random_key
+						)
 					)
 					verify_code = on_captcha_need.call(net_helper.get(uri))
 					log(logger, "验证码： #{verify_code}")
@@ -109,38 +150,54 @@ class WebQQClient
 
 				# 验证账号
 				log(logger, '验证账号……')
-				uri = Util::NetHelper.uri_https(
-					'ssl.ptlogin2.qq.com',
-					'/login',
-					u: qq,
-					p: password_encrypted,
-					verifycode: verify_code.downcase,
-					webqq_type: 10,
-					remember_uin: 1,
-					login2qq: 1,
-					aid: APPID,
-					u1:  'http://web2.qq.com/loginproxy.html?login2qq=1&webqq_type=10',
-					h: 1,
-					ptredirect: 0,
-					ptlang: 2052,
-					daid: 164,
-					from_ui: 1,
-					pttype: 1,
-					dumy: nil,
-					fp: 'loginerroralert',
-					action: '3-19-312901',
-					mibao_css: 'm_webqq',
-					t: 1,
-					g: 1,
-					js_ver: JS_VER,
-					js_type: JS_TYPE,
-					login_sig: 'EDCv9dZdzXo5FchLpEEgEk-coa77jI5yM8L7rEhPWJCYGQlEMBdf5fRmccPqtHKt'
+				uri = URI::HTTPS.build(
+					host: HOST_SSL_PTLOGIN2_QQ,
+					path: '/login',
+					query: URI.encode_www_form(
+						u: qq,
+						p: password_encrypted,
+						verifycode: verify_code.downcase,
+						webqq_type: 10,
+						remember_uin: 1,
+						login2qq: 1,
+						aid: APPID,
+						u1:  'http://web2.qq.com/loginproxy.html?login2qq=1&webqq_type=10',
+						h: 1,
+						ptredirect: 0,
+						ptlang: 2052,
+						daid: 164,
+						from_ui: 1,
+						pttype: 1,
+						dumy: nil,
+						fp: 'loginerroralert',
+						action: '3-19-312901',
+						mibao_css: 'm_webqq',
+						t: 1,
+						g: 1,
+						js_ver: JS_VER,
+						js_type: JS_TYPE,
+						login_sig: LOGIN_SIG
+					)
 				)
 				state, _, address, info, _, nickname = net_helper.get(uri).scan(/'.*?'/).map{|str| str[1..-2]}
 				state = state.to_i
-				raise LoginFailed.new(state, info.force_encoding('utf-8')) unless state.zero?
-				@nickname = nickname.force_encoding('utf-8')
-				log(logger, "账号验证成功，昵称：#{@nickname}")
+				nickname = nickname.force_encoding('utf-8')
+				raise LoginFailed.new(state, info) unless state.zero?
+				log(logger, "账号验证成功，昵称：#{nickname}")
+
+				# 连接给定地址获得cookie
+				log(logger, '获取cookie……')
+				uri = URI(address)
+				net_helper.get(uri)
+				ptwebqq = net_helper.cookies[COOKIE_KEY_PTWEBQQ]
+
+				net_helper.add_header(HEADER_KEY_REFERER, HEADER_REFERER)
+
+				# 正式登录
+				log(logger, '正在登陆……')
+				json_data = get_session_data(net_helper, client_id, ptwebqq)
+				p_session_id, uin, verify_webqq = json_data[JSON_KEY_PSESSIONID], json_data[JSON_KEY_UIN], json_data[JSON_KEY_VFWEBQQ]
+				log(logger, '登陆成功')
 			rescue LoginFailed => ex
 				case ex.state
 				when 3
@@ -157,21 +214,6 @@ class WebQQClient
 					return
 				end
 			end
-
-			# 连接给定地址获得cookie
-			log(logger, '获取cookie……')
-			net_helper.get(URI(address))
-			ptwebqq = net_helper.cookies['ptwebqq']
-
-
-			net_helper.add_header('Content-Type', 'application/x-www-form-urlencoded')
-			net_helper.add_header('Referer', 'http://d.web2.qq.com/proxy.html?v=20110331002&callback=1&id=2')
-
-			# 正式登录
-			log(logger, '正在登陆...')
-			session_data = get_session_data(net_helper, client_id, ptwebqq)
-			p_session_id, uin, verify_webqq = session_data['psessionid'], session_data['uin'], session_data['vfwebqq']
-			log(logger, '登陆成功')
 
 			{
 				client_id: client_id,
@@ -190,12 +232,15 @@ class WebQQClient
 			logger.log(level, message, self.name)
 		end
 
+
+		URI_GET_SESSION_DATA = URI('https://d.web2.qq.com/channel/login2')
+
 		def self.get_session_data(net_helper, client_id, ptwebqq)
 			json_data = JSON.parse(
 				net_helper.post(
-					Util::NetHelper.uri_https('d.web2.qq.com', '/channel/login2'),
+					URI_GET_SESSION_DATA,
 					URI.encode_www_form(
-						r: JSON.generate(
+						r: JSON.fast_generate(
 							status: 'online',
 							ptwebqq: ptwebqq,
 							passwd_sig: '',
@@ -206,30 +251,28 @@ class WebQQClient
 					)
 				)
 			)
-			raise ErrorCode.new(json_data['retcode'], json_data) unless json_data['retcode'] == 0
-			json_data['result']
+			raise ErrorCode.new(json_data[JSON_KEY_RETCODE], json_data) unless json_data[JSON_KEY_RETCODE] == 0
+			json_data[JSON_KEY_RESULT]
 		end
 	end
 
 	# 封装消息接收线程
 	class MessageReceiver
 		TIMEOUT = 120
-		KEY_RETCODE = 'retcode'
-		KEY_RESULT = 'result'
 
 		# 创建接收线程
-		def initialize(cookies, logger, client_id, p_session_id)
+		def initialize(client_id, p_session_id ,cookies, logger)
 			@logger = logger
 			@messages= Queue.new
 			@thread = Thread.new do
 				begin
 					log('线程启动……')
-					http = Net::HTTP.start('d.web2.qq.com', read_timeout: TIMEOUT)
+					http = Net::HTTP.start(HOST_D_WEB2_QQ, read_timeout: TIMEOUT)
 					request = Net::HTTP::Post.new(
 						'/channel/poll2',
-						'User-Agent' => USER_AGENT,
-						'Referer' => 'http://d.web2.qq.com/proxy.html?v=20110331002&callback=1&id=2',
-						'Cookie' => cookies
+						HEADER_KEY_USER_AGENT => HEADER_USER_AGENT,
+						HEADER_KEY_REFERER => HEADER_REFERER,
+						HEADER_KEY_COOKIE => cookies
 					)
 					request.set_form_data(
 						r: JSON.generate(clientid: client_id, psessionid: p_session_id, key: 0, ids: []),
@@ -239,8 +282,8 @@ class WebQQClient
 					loop do
 						begin
 							json_data = JSON.parse(http.request(request).body)
-							raise ErrorCode.new(json_data[KEY_RETCODE], json_data) unless json_data[KEY_RETCODE] == 0
-							@messages.push json_data[KEY_RESULT]
+							raise ErrorCode.new(json_data[JSON_KEY_RETCODE], json_data) unless json_data[JSON_KEY_RETCODE] == 0
+							@messages.push json_data[JSON_KEY_RESULT]
 						rescue WebQQClient::ErrorCode => ex
 							case ex.error_code
 							when 102, 116
@@ -254,9 +297,11 @@ class WebQQClient
 						end
 					end
 				rescue Exception => ex
-					log("捕获到异常：#{ex.message}", Logger::ERROR)
-					log("调用栈：\n#{ex.backtrace.join("\n")}", Logger::ERROR)
-					log('线程重启……')
+					log(<<LOG.strip, Logger::ERROR)
+捕获到异常：#{ex.message}
+调用栈：\n#{ex.backtrace.join("\n")}
+线程重启……
+LOG
 					redo
 				end
 			end
@@ -276,7 +321,6 @@ class WebQQClient
 
 	# 封装消息发送线程
 	class MessageSender
-		KEY_RETCODE = 'retcode'
 		STRING_FONT = 'font'
 		DEFAULT_FONT_FACE = '宋体'
 		DEFAULT_COLOR = '000000'
@@ -288,19 +332,14 @@ class WebQQClient
 			@thread = Thread.new(client_id1, p_session_id1) do |client_id, p_session_id|
 				begin
 					log('线程启动……')
-					https = Net::HTTP.start('d.web2.qq.com', 443, use_ssl: true, verify_mode: OpenSSL::SSL::VERIFY_NONE)
-					buddy_request = Net::HTTP::Post.new(
-						'/channel/send_buddy_msg2',
-						'User-Agent' => USER_AGENT,
-						'Referer' => 'https://d.web2.qq.com/cfproxy.html?v=20110331002&callback=1',
-						'Cookie' => cookies
-					)
-					qun_request = Net::HTTP::Post.new(
-						'/channel/send_qun_msg2',
-						'User-Agent' => USER_AGENT,
-						'Referer' => 'https://d.web2.qq.com/cfproxy.html?v=20110331002&callback=1',
-						'Cookie' => cookies
-					)
+					https = Net::HTTP.start(HOST_D_WEB2_QQ, 443, use_ssl: true, verify_mode: OpenSSL::SSL::VERIFY_NONE)
+					init_header = {
+						HEADER_KEY_USER_AGENT => HEADER_USER_AGENT,
+						HEADER_KEY_REFERER => HEADER_REFERER,
+						HEADER_KEY_COOKIE => cookies
+					}
+					buddy_request = Net::HTTP::Post.new('/channel/send_buddy_msg2', init_header)
+					qun_request = Net::HTTP::Post.new('/channel/send_qun_msg2', init_header)
 					message_counter = Random.rand(1000...10000) * 10000
 					loop do
 						data = @messages.pop
@@ -309,7 +348,7 @@ class WebQQClient
 							when :group_message
 								message_counter += 1
 								qun_request.set_form_data(
-									r: JSON.generate(
+									r: JSON.fast_generate(
 										group_uin: data[:uin],
 										content: encode_content(data[:message], data[:font]),
 										msg_id: message_counter,
@@ -319,15 +358,11 @@ class WebQQClient
 									clientid: client_id,
 									psessionid: p_session_id
 								)
-								log("HTTP POST #{qun_request.path}", Logger::DEBUG) if $-d
-								log("BODY：#{qun_request.body}", Logger::DEBUG) if $-d
-								json_data = JSON.parse(https.request(qun_request).body)
-								log("RESPONSE：#{json_data}", Logger::DEBUG) if $-d
-								raise ErrorCode.new(json_data[KEY_RETCODE], json_data) unless json_data[KEY_RETCODE] == 0
+								post(https, qun_request)
 							when :message
 								message_counter += 1
 								buddy_request.set_form_data(
-									r: JSON.generate(
+									r: JSON.fast_generate(
 										to: data[:uin],
 										face: 0,
 										content: encode_content(data[:message], data[:font]),
@@ -338,11 +373,7 @@ class WebQQClient
 									clientid: client_id,
 									psessionid: p_session_id
 								)
-								log("HTTP POST：#{buddy_request.path}", Logger::DEBUG) if $-d
-								log("BODY：#{buddy_request.body}", Logger::DEBUG) if $-d
-								json_data = JSON.parse(https.request(buddy_request).body)
-								log("RESPONSE：#{json_data}", Logger::DEBUG) if $-d
-								raise ErrorCode.new(json_data[KEY_RETCODE], json_data) unless json_data[KEY_RETCODE] == 0
+								post(https, buddy_request)
 							else
 								next
 							end
@@ -352,9 +383,11 @@ class WebQQClient
 						end
 					end
 				rescue Exception => ex
-					log("捕获到异常：#{ex.message}", Logger::ERROR)
-					log("调用栈：\n#{ex.backtrace.join("\n")}", Logger::ERROR)
-					log('线程重启……')
+					log(<<LOG.strip, Logger::ERROR)
+捕获到异常：#{ex.message}
+调用栈：\n#{ex.backtrace.join("\n")}
+线程重启……
+LOG
 					redo
 				end
 			end
@@ -388,9 +421,19 @@ class WebQQClient
 			@logger.log(level, message, self.class.name)
 		end
 
+		def post(https, request)
+			log(<<LOG.strip, Logger::DEBUG) if $-d
+HTTP POST：#{request.path}
+　BODY：#{request.body}
+LOG
+			json_data = JSON.parse(https.request(request).body)
+			log("RESPONSE：#{json_data}", Logger::DEBUG) if $-d
+			raise ErrorCode.new(json_data[JSON_KEY_RETCODE], json_data) unless json_data[JSON_KEY_RETCODE] == 0
+		end
+
 		# 编码内容数据
 		def encode_content(message, font)
-			JSON.generate(
+			JSON.fast_generate(
 				[
 					message,
 					'',
@@ -414,19 +457,15 @@ class WebQQClient
 
 	# QQ好友类
 	class QQFriend
-		attr_reader :uin, :nickname, :markname, :qq_number, :info
+		attr_reader :uin, :qq_number, :info, :nickname
 
 		# @param [WebQQClient] client
-		def initialize(client, uin, nickname, markname = nil)
+		def initialize(client, uin, markname = nil)
 			@uin = uin
-			@nickname, @markname = nickname, markname
+			@nickname = markname
 			@qq_number = client.fetch_qq_number(uin)
 			@info = client.fetch_friend_info(uin)
-		end
-
-		# 返回名片或昵称
-		def name
-			@markname ? @markname : @nickname
+			@nickname = @info[JSON_KEY_NICK] unless @nickname
 		end
 
 		# 使用幽灵方法访问各属性
@@ -439,39 +478,56 @@ class WebQQClient
 			end
 			res
 		end
+
+		def to_s
+			"#{@nickname}(#{@qq_number})"
+		end
+	end
+
+	class QQGroupMember
+		attr_reader :uin, :qq_number, :nickname
+
+		# @param [WebQQClient] client
+		def initialize(client, uin, card = nil)
+			@uin = uin
+			@nickname = card
+			@qq_number = client.fetch_qq_number(uin)
+		end
+
+		def to_s
+			"#{@nickname}(#{@qq_number})"
+		end
 	end
 
 	# QQ群类
 	class QQGroup
-		attr_reader :uin, :group_code, :group_name, :group_number, :group_info
-
-		KEY_MINFO = 'minfo'
-		KEY_MUIN  = 'muin'
-		KEY_UIN   = 'uin'
-		KEY_NICK  = 'nick'
-		KEY_CARDS = 'cards'
-		KEY_CARD  = 'card'
+		attr_reader :uin, :group_code, :group_name, :group_number, :group_info, :members
 
 		# @param [WebQQClient] client
 		def initialize(client, uin, group_code, group_name)
+			@client = client
 			@uin = uin
 			@group_code, @group_name = group_code, group_name
 			@group_number = client.fetch_group_number(group_code)
 			@group_info = client.fetch_group_info(group_code)
-			@group_nicknames = {}
-			@group_info[KEY_MINFO].each do |member|
-				@group_nicknames[member[KEY_UIN]] = member[KEY_NICK]
+			@nicknames = {}
+			@group_info[JSON_KEY_MINFO].each do |member|
+				@nicknames[member[JSON_KEY_UIN]] = member[JSON_KEY_NICK]
 			end
-			@group_info[KEY_CARDS].each do |card|
-				@group_nicknames[card[KEY_MUIN]] = card[KEY_CARD]
+			@group_info[JSON_KEY_CARDS].each do |card|
+				@nicknames[card[JSON_KEY_MUIN]] = card[JSON_KEY_CARD]
 			end
+			@members = {}
 		end
 
-		alias name group_name
+		def member(uin)
+			return @members[uin] if @members[uin]
+			@members[uin] = QQGroupMember.new(@client, uin, @nicknames[uin])
+		end
 
-		# 返回群名片
-		def group_nickname(uin)
-			@group_nicknames[uin]
+
+		def to_s
+			"#{@group_name}(#{@group_number})"
 		end
 	end
 
@@ -483,7 +539,7 @@ class WebQQClient
 		@logger, @on_captcha_need = logger, on_captcha_need
 
 		@net_helper = Util::NetHelper.new(@logger)
-		@net_helper.add_header('User-Agent', USER_AGENT)
+		@net_helper.add_header(HEADER_KEY_USER_AGENT, HEADER_USER_AGENT)
 
 		@logined = false
 	end
@@ -505,20 +561,23 @@ class WebQQClient
 	end
 
 	# 登出
+	PATH_LOGOUT = '/channel/logout2'
 	def logout
 		return unless @logined
 		log('开始登出……')
-		uri = @net_helper.uri_https(
-			'd.web2.qq.com',
-			'/channel/logout2',
-			ids: nil,
-			clientid: @client_id,
-			psessionid: @p_session_id,
-			t: Time.now.to_i
+		uri = URI::HTTPS.build(
+			host: HOST_D_WEB2_QQ,
+			path: PATH_LOGOUT,
+			query: URI.encode_www_form(
+				ids: nil,
+				clientid: @client_id,
+				psessionid: @p_session_id,
+				t: Time.now.to_i
+			)
 		)
 		ret = 0
 		begin
-			util_get_json_data(uri)
+			util_get_json_data_result(uri)
 			log('登出成功！')
 		rescue ErrorCode => ex
 			log("登出失败！(返回码=#{ex.error_code},返回信息=#{ex.raw_data['result']})")
@@ -538,9 +597,6 @@ class WebQQClient
 		log(message, Logger::DEBUG) if $DEBUG
 	end
 
-	KEY_RETCODE = 'retcode'
-	KEY_RESULT = 'result'
-
 	# HTTP POST 请求
 	def util_post_request(raw_data, uri)
 		data = URI.encode_www_form(
@@ -548,19 +604,18 @@ class WebQQClient
 			clientid: @client_id,
 			psessionid: @p_session_id
 		)
-		# @net_helper.add_header('Content-Type', 'application/x-www-form-urlencoded')
 		json_data = JSON.parse(@net_helper.post(uri, data))
-		# @net_helper.delete_header('Content-Type')
-		raise ErrorCode.new(json_data[KEY_RETCODE], json_data) unless json_data[KEY_RETCODE] == 0
-		log("response data: #{json_data[KEY_RESULT]}", Logger::DEBUG) if $-d
-		json_data[KEY_RESULT]
+		log("response data: #{json_data}", Logger::DEBUG) if $-d
+		raise ErrorCode.new(json_data[JSON_KEY_RETCODE], json_data) unless json_data[JSON_KEY_RETCODE] == 0
+		json_data[JSON_KEY_RESULT]
 	end
 
 	# HTTP GET 请求，返回解析后的 json 数据
-	def util_get_json_data(uri)
+	def util_get_json_data_result(uri)
 		json_data = JSON.parse(@net_helper.get(uri))
-		raise ErrorCode.new(json_data[KEY_RETCODE], json_data) unless json_data[KEY_RETCODE] == 0
-		json_data
+		log("response data: #{json_data}", Logger::DEBUG) if $-d
+		raise ErrorCode.new(json_data[JSON_KEY_RETCODE], json_data) unless json_data[JSON_KEY_RETCODE] == 0
+		json_data[JSON_KEY_RESULT]
 	end
 
 	# 获取群信息
@@ -580,17 +635,19 @@ class WebQQClient
 }
 =end
 	# @return [Array[QQGroup]]
+
+	URI_GET_GROUP_NAME_LIST = URI::HTTP.build(
+		host: HOST_S_WEB2_QQ,
+		path: '/api/get_group_name_list_mask2'
+	)
 	def groups
-		raw_data = JSON.generate(vfwebqq: @verify_webqq)
-		uri = @net_helper.uri_http(
-			's.web2.qq.com',
-			'/api/get_group_name_list_mask2'
-		)
-		json_data = self.util_post_request(raw_data, uri)
-		log("json_data = #{json_data}", Logger::DEBUG) if $-d
-		json_data['gnamelist'].map do |group|
-			QQGroup.new(self, group['gid'], group['code'], group['name'])
+		raw_data = JSON.fast_generate(vfwebqq: @verify_webqq)
+		json_data = util_post_request(raw_data, URI_GET_GROUP_NAME_LIST)
+		groups = []
+		json_data[JSON_KEY_GNAMELIST].each do |group|
+			groups << QQGroup.new(self, group[JSON_KEY_GID], group[JSON_KEY_CODE], group[JSON_KEY_NAME])
 		end
+		groups
 	end
 
 	def friends_hash(b, i)
@@ -626,25 +683,27 @@ class WebQQClient
 }
 =end
 	# @return [Array[QQFriend]]
+	GET_FRIENDS_HELLO_MESSAGE = 'hello'
+	URI_GET_USER_FRIENDS = URI::HTTP.build(
+		host: HOST_S_WEB2_QQ,
+		path: '/api/get_user_friends2'
+	)
 	def friends
 		raw_data = JSON.generate(
-			h: 'hello',
+			h: GET_FRIENDS_HELLO_MESSAGE,
 			hash: friends_hash(@uin, @ptwebqq),
 			vfwebqq: @verify_webqq
 		)
-		uri = @net_helper.uri_http(
-			's.web2.qq.com',
-			'/api/get_user_friends2'
-		)
-		json_data = self.util_post_request(raw_data, uri)
-
-		json_data['friends'].map do |friend|
-			uin = friend['uin']
-			nickname = json_data['info'].find{|t| t['uin'] == uin }['nick']
-			markname = json_data['marknames'].find{|t| t['uin'] == uin }
-			markname = markname['markname'] if markname
-			QQFriend.new(self, uin, nickname, markname)
+		json_data = util_post_request(raw_data, URI_GET_USER_FRIENDS)
+		marknames = json_data[JSON_KEY_MARKNAMES]
+		friends = []
+		json_data[JSON_KEY_FRIENDS].each do |friend|
+			uin = friend[JSON_KEY_UIN]
+			markname = marknames.find{|t| t[JSON_KEY_UIN] == uin }
+			markname = markname[JSON_KEY_MARKNAME] if markname
+			friends << QQFriend.new(self, uin, markname)
 		end
+		friends
 	end
 
 	# 通过 uin 获取 QQ 号
@@ -655,18 +714,21 @@ class WebQQClient
 	"uin":0
 }
 =end
+	PATH_GET_QQ_NUMBER = '/api/get_friend_uin2'
 	def fetch_qq_number(uin)
-		uri = @net_helper.uri_http(
-			's.web2.qq.com',
-			'/api/get_friend_uin2',
-			tuin: uin,
-			verifysession: nil,
-			type: 1,
-			code: nil,
-			vfwebqq: @verify_webqq,
-			t: Time.now.to_i
+		uri = URI::HTTP.build(
+			host: HOST_S_WEB2_QQ,
+			path: PATH_GET_QQ_NUMBER,
+			query: URI.encode_www_form(
+				tuin: uin,
+				verifysession: nil,
+				type: 1,
+				code: nil,
+				vfwebqq: @verify_webqq,
+				t: Time.now.to_i
+			)
 		)
-		self.util_get_json_data(uri)['result']['account']
+		self.util_get_json_data_result(uri)[JSON_KEY_ACCOUNT]
 	end
 
 	# 通过 uin 获取群号
@@ -677,18 +739,19 @@ class WebQQClient
 	"uin":0
 }
 =end
+	PATH_GET_GROUP_NUMBER = '/api/get_friend_uin2'
 	def fetch_group_number(uin)
-		uri = @net_helper.uri_http(
-			's.web2.qq.com',
-			'/api/get_friend_uin2',
-			tuin: uin,
-			verifysession: nil,
-			type: 4,
-			code: nil,
-			vfwebqq: @verify_webqq,
-			t: Time.now.to_i
+		uri = URI::HTTP.build(
+			host: HOST_S_WEB2_QQ,
+			path: PATH_GET_GROUP_NUMBER,
+			query: URI.encode_www_form(tuin: uin,
+				verifysession: nil,
+				type: 4,
+				code: nil,
+				vfwebqq: @verify_webqq,
+				t: Time.now.to_i)
 		)
-		self.util_get_json_data(uri)['result']['account']
+		self.util_get_json_data_result(uri)[JSON_KEY_ACCOUNT]
 	end
 
 	# 通过 uin 获取好友信息
@@ -718,17 +781,20 @@ class WebQQClient
 "mobile":""
 }
 =end
+	PATH_GET_FRIEND_INFO = '/api/get_friend_info2'
 	def fetch_friend_info(uin)
-		uri = @net_helper.uri_http(
-			's.web2.qq.com',
-			'/api/get_friend_info2',
-			tuin: uin,
-			verifysession: nil,
-			code: nil,
-			vfwebqq: @verify_webqq,
-			t: Time.now.to_i
+		uri = URI::HTTP.build(
+			host: HOST_S_WEB2_QQ,
+			path: PATH_GET_FRIEND_INFO,
+			query: URI.encode_www_form(
+				tuin: uin,
+				verifysession: nil,
+				code: nil,
+				vfwebqq: @verify_webqq,
+				t: Time.now.to_i
+			)
 		)
-		self.util_get_json_data(uri)['result']
+		self.util_get_json_data_result(uri)
 	end
 
 	# 通过 uin 获取群信息
@@ -758,20 +824,37 @@ class WebQQClient
 	"cards":[{"muin":, "card":"安安子"}, ...... ]
 }
 =end
+	PATH_GET_GROUP_INFO = '/api/get_group_info_ext2'
 	def fetch_group_info(group_code)
-		uri = @net_helper.uri_http(
-			's.web2.qq.com',
-			'/api/get_group_info_ext2',
-			gcode: group_code,
-			vfwebqq: @verify_webqq,
-			t: Time.now.to_i
+		uri = URI::HTTP.build(
+			host: HOST_S_WEB2_QQ,
+			path: PATH_GET_GROUP_INFO,
+			query: URI.encode_www_form(
+				gcode: group_code,
+				vfwebqq: @verify_webqq,
+				t: Time.now.to_i
+			)
 		)
-		self.util_get_json_data(uri)['result']
+		self.util_get_json_data_result(uri)
+	end
+
+	URI_ADD_FRIEND = URI::HTTP.build(
+		host: HOST_S_WEB2_QQ,
+		path: '/api/allow_and_add2'
+	)
+	def add_friend(account, mname = '')
+		raw_data = JSON.generate(
+			account: account,
+			gid: 0,
+			mname: mname,
+			vfwebqq: @verify_webqq
+		)
+		QQFriend.new(self, util_post_request(raw_data, URI_ADD_FRIEND)[JSON_KEY_TUIN])
 	end
 
 	# 获取消息接收者
 	def receiver
-		MessageReceiver.new(@net_helper.cookies.to_s, @logger, @client_id, @p_session_id)
+		MessageReceiver.new(@client_id, @p_session_id, @net_helper.cookies.to_s, @logger)
 	end
 
 	# 获取消息发送者

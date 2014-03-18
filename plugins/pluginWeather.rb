@@ -17,7 +17,7 @@ class PluginWeather < PluginNicknameResponserBase
 MANUAL
 	PRIORITY = 0
 
-	URI_FORMAT = 'http://api.map.baidu.com/telematics/v3/weather?location=%s&output=json&ak=<ak>'
+	URI_FORMAT = 'http://api.map.baidu.com/telematics/v3/weather?location=%s&output=json&ak=TnChRGR56PhGC0mjA1rG0ueG'
 
 	COMMAND_PATTERN = /^天气\s*(?<city>.+)$/
 

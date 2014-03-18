@@ -20,7 +20,7 @@ MANUAL
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		super
 		if COMMAND_DICE == message
-			"#{@nickname} 掷出了 #{rand(1..6)}"
+			"#{bot_name} 掷出了 #{rand(1..6)}"
 		elsif COMMAND_CHOOSE =~ message
 			if rand(0..1).zero?
 				"#{$~[:act]}！"

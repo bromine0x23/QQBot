@@ -18,7 +18,6 @@ class QQBot
 	attr_reader :groups
 	attr_reader :friends
 	attr_reader :masters
-	attr_reader :uin_map
 
 	def initialize
 		load_config
@@ -32,16 +31,12 @@ class QQBot
 		begin
 			log('开始运行……')
 			@client.login
-			@groups = @client.groups
-			@friends = @client.friends
-			@uin_map = {}
-			@groups.each { |group| @uin_map[group.uin] = group }
-			@friends.each { |friend| @uin_map[friend.uin] = friend }
-			save_uins
-
-			@message_receiver =@client.receiver
+			@message_receiver = @client.receiver
 			@message_sender = @client.sender
+			refresh_entities
+			save_entities
 			begin
+				puts 'QQBot已成功登录！'
 				loop do
 					datas = @message_receiver.data
 					datas.each do |data|
@@ -49,6 +44,7 @@ class QQBot
 						poll_type, value = data[KEY_POLL_TYPE], data[KEY_VALUE]
 						from_uin = value[KEY_FROM_UIN]
 						event = :"on_#{poll_type}"
+
 						@plugins.each do |plugin|
 							next if plugin_forbidden?(from_uin, plugin)
 							begin
@@ -90,7 +86,6 @@ class QQBot
 
 	def stop
 		@client.logout
-		@groups, @friends, @uin_map = nil, nil, nil
 		@message_receiver, @message_sender = nil, nil
 		Thread.list.each do |thread|
 			thread.terminate if thread != Thread.main
@@ -109,13 +104,13 @@ class QQBot
 		content.select{ |item| item.is_a? String }.join.strip
 	end
 
-	def enable_plugin(uin, plugin)
+	def enable_plugin(uin, qq_number, plugin)
 		if @forbidden.has_key? uin
 			@forbidden[uin].delete(plugin.class.name)
 		end
 	end
 
-	def disable_plugin(uin, plugin)
+	def disable_plugin(uin, qq_number, plugin)
 		if @forbidden.has_key? uin
 			@forbidden[uin] << plugin.class.name unless @forbidden[uin].include? plugin.class.name
 		else
@@ -127,35 +122,49 @@ class QQBot
 		@forbidden.has_key? uin and @forbidden[uin].include? plugin.class.name
 	end
 
-	def master?(qq)
-		@masters.include? qq
+	def master?(qq_number)
+		@masters.include? qq_number
 	end
 
-	def group_master?(group_number, qq_number)
+	#def group_master?(group_number, qq_number)
+	#end
+
+	def friend(uin)
+		@friends[uin]
 	end
 
-
-	def friend_nickname(uin)
-		@uin_map[uin].name
+	def group(guin)
+		@groups[guin]
 	end
 
-	def group_nickname(guin, uin)
-		@uin_map[guin].group_nickname(uin)
+	def group_member(guin, uin)
+		@groups[guin].member(uin)
 	end
 
-	def qq_number(uin)
-		return @uin_map[uin].qq_number if @uin_map.has_key? uin
-		@client.fetch_qq_number(uin)
+	def refresh_entities
+		friends, groups = @client.friends, @client.groups
+		@friends, @groups = {}, {}
+		friends.each do |friend|
+			@friends[friend.uin] = friend unless @friends[friend.uin]
+		end
+		groups.each do |group|
+			@groups[group.uin] = group unless @groups[group.uin]
+		end
+
+		@entities = @friends.merge @groups
+
+		true
+	end
+
+	def add_friend(uin)
+		new_friend = @client.add_friend(uin)
+		@friends[new_friend.uin] = new_friend
 	end
 
 	private
 
 	def log(message, level = Logger::INFO)
 		@logger.log(level, message, self.class.name)
-	end
-
-	def debug(message)
-		log(message, Logger::DEBUG) if $DEBUG
 	end
 
 	def load_config
@@ -175,15 +184,16 @@ class QQBot
 	def load_plugins
 		log('载入插件……')
 		Dir.glob(LOAD_PLUGINS_PATH) { |file_name| load file_name }
-		@plugins = PluginBase.plugins
-		.map { |plugin_class|
+		@plugins = []
+		PluginBase.plugins.each { |plugin_class|
 			begin
-				plugin_class.new(self, @logger)
+				@plugins << plugin_class.new(self, @logger)
 			rescue Exception => ex
 				log("载入插件 #{plugin_class::NAME} 时发生异常：#{ex}", Logger::ERROR)
 				log("调用栈：\n#{ex.backtrace.join("\n")}", Logger::ERROR)
 			end
-		}.sort! { |plugin1, plugin2| plugin2.priority <=> plugin1.priority }
+		}
+		@plugins.sort! { |plugin1, plugin2| plugin2.priority <=> plugin1.priority }
 		load_plugin_config
 		log('插件载入完毕')
 	end
@@ -209,17 +219,19 @@ class QQBot
 		@logger
 	end
 
-	def save_uins
-		File.open('uin_map.txt', 'w') do |file|
-			@uin_map.each do |key, value|
-				if value.is_a? WebQQClient::QQGroup
-					file << <<LINE
-#{key} : QQ群 #{value.group_name}(#{value.group_code})
-LINE
-				elsif value.is_a? WebQQClient::QQFriend
-					file << <<LINE
-#{key} : QQ用户 #{value.name}(#{value.qq_number})
-LINE
+	def save_entities
+		File.open('entities.txt', 'w') do |file|
+			@entities.each do |uid, entity|
+				if entity.is_a? WebQQClient::QQGroup
+					file << <<ENTITY << <<MEMBERS
+QQ群：#{entity.group_name}(#{entity.group_number}) => #{uid}
+ENTITY
+#{entity.members.map{|member| "#{member.nickname}(#{member.qq_number}) => #{member.uid}"}.join('\n') }
+MEMBERS
+				elsif entity.is_a? WebQQClient::QQFriend
+					file << <<ENTITY
+QQ用户：#{entity.nickname}(#{entity.qq_number}) => #{uid}
+ENTITY
 				end
 			end
 		end

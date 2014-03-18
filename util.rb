@@ -17,7 +17,7 @@ module Util
 		end
 
 		# 更新Cookie
-		def update(str)
+		def update!(str)
 			@cookies.delete_if do |_, cookie|
 				cookie.expires and cookie.expires < Time.now
 			end
@@ -70,51 +70,22 @@ module Util
 			Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == SCHEME_HTTPS, verify_mode: OpenSSL::SSL::VERIFY_NONE) do |http|
 				@header[KEY_COOKIE] = @cookies.to_s
 				response = http.request(Net::HTTP::Get.new(uri, @header))
-				@cookies.update(response[KEY_SET_COOKIE]) if response[KEY_SET_COOKIE]
+				@cookies.update!(response[KEY_SET_COOKIE]) if response[KEY_SET_COOKIE]
+				log("BODY: #{response.body}", Logger::DEBUG) if $-d
 				return response.body
 			end
 		end
 
 		def post(uri, data)
 			log("HTTP POST: #{uri}", Logger::DEBUG) if $-d
+			log("　DATA: #{data}", Logger::DEBUG) if $-d
 			Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == SCHEME_HTTPS, verify_mode: OpenSSL::SSL::VERIFY_NONE) do |http|
 				@header[KEY_COOKIE] = @cookies.to_s
 				response = http.request(Net::HTTP::Post.new(uri, @header), data)
-				@cookies.update(response[KEY_SET_COOKIE]) if response[KEY_SET_COOKIE]
+				@cookies.update!(response[KEY_SET_COOKIE]) if response[KEY_SET_COOKIE]
+				log("BODY: #{response.body}", Logger::DEBUG) if $-d
 				return response.body
 			end
-		end
-
-		def self.uri_https(host, path = DEFAULT_PATH, queries = DEFAULT_QUERIES)
-			URI::HTTPS.build(
-				host: host,
-				path: path,
-				query: URI.encode_www_form(queries)
-			)
-		end
-
-		def self.uri_http(host, path = DEFAULT_PATH, queries = DEFAULT_QUERIES)
-			URI::HTTP.build(
-				host: host,
-				path: path,
-				query: URI.encode_www_form(queries)
-			)
-		end
-
-		def uri_https(host, path = DEFAULT_PATH, queries = DEFAULT_QUERIES)
-			URI::HTTPS.build(
-				host: host,
-				path: path,
-				query: URI.encode_www_form(queries)
-			)
-		end
-
-		def uri_http(host, path = DEFAULT_PATH, queries = DEFAULT_QUERIES)
-			URI::HTTP.build(
-				host: host,
-				path: path,
-				query: URI.encode_www_form(queries)
-			)
 		end
 
 		private

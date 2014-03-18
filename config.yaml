@@ -2,11 +2,11 @@
 common:
   log_file: qqbot.log
   captcha_file: captcha.jpg
-  qq: ''
-  password: 
-  bot_name: 
+  qq: '2833971744'
+  password: 17A81E38
+  bot_name: 晒晒子
   masters:
-  - 
+  - 396893752
 font:
   name: 微软雅黑
   size: 12

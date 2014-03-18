@@ -8,7 +8,7 @@ require 'sqlite3'
 class PluginAI < PluginNicknameResponserBase
 	NAME = 'AI插件'
 	AUTHOR = 'BR'
-	VERSION = '1.5'
+	VERSION = '1.7'
 	DESCRIPTION = '人家才不是AI呢'
 	MANUAL = <<MANUAL
 == 复述 ==
@@ -33,20 +33,20 @@ MANUAL
 	DB_FILE = File.expand_path(File.dirname(__FILE__) + '/pluginAI.db')
 
 	SQL_CREATE_TABLE_MESSAGES = <<SQL
-CREATE TABLE messages(
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    message    TEXT NOT NULL,
-    created_at TIMESTAMP
+CREATE TABLE messages (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	message    TEXT NOT NULL,
+	created_at TIMESTAMP
 )
 SQL
 
 	SQL_CREATE_TABLE_RESPONSES = <<SQL
-CREATE TABLE responses(
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    message_id INTEGER REFERENCES messages (id),
-    response   TEXT,
-    created_by INTEGER NOT NULL,
-    created_at TIMESTAMP
+CREATE TABLE responses (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	message_id INTEGER REFERENCES messages (id),
+	response   TEXT,
+	created_by INTEGER NOT NULL,
+	created_at TIMESTAMP
 )
 SQL
 
@@ -67,8 +67,7 @@ SQL
 	SQL_GET_RESPONSES = <<SQL
 SELECT response
 FROM responses
-WHERE message_id in
-(
+WHERE message_id IN (
 	SELECT id
 	FROM messages
 	WHERE message = ?
@@ -95,8 +94,7 @@ SQL
 	SQL_REMOVE_RESPONSES = <<SQL
 DELETE
 FROM responses
-WHERE message_id in
-(
+WHERE message_id IN (
 	SELECT id
 	FROM messages
 	WHERE message = ?
@@ -123,9 +121,9 @@ SQL
 	def on_load
 		super
 		log('连接数据库……')
-		@db = SQLite3::Database.new(DB_FILE)
-		@db.execute SQL_CREATE_TABLE_MESSAGES if @db.get_first_value(SQL_CHECK_TABLE, TABLE_MESSAGES) == 0
-		if @db.get_first_value(SQL_CHECK_TABLE, TABLE_RESPONSES) == 0
+		@db = SQLite3::Database.open DB_FILE
+		@db.execute SQL_CREATE_TABLE_MESSAGES if @db.get_first_value(SQL_CHECK_TABLE, TABLE_MESSAGES).zero?
+		if @db.get_first_value(SQL_CHECK_TABLE, TABLE_RESPONSES).zero?
 			@db.execute SQL_CREATE_TABLE_RESPONSES
 			@db.execute SQL_CREATE_INDEX_ON_RESPONSES
 		end
@@ -143,7 +141,7 @@ SQL
 			$~[:response]
 		elsif COMMAND_LEARN =~ message
 			command = $~[:command]
-			debug("command:\n#{command.inspect}")
+			log("command:\n#{command.inspect}", Logger::DEBUG) if$-d
 			if COMMAND_LEARN_MULTILINE =~ command or COMMAND_LEARN_TOWLINE =~ command or COMMAND_LEARN_ONELINE =~ command
 				response = $~[:response].strip
 				if response.length < RESPONSE_DOOR
@@ -162,24 +160,25 @@ SQL
 	end
 
 	def learn(message, response, created_by)
-		debug("Teacher #{message} => #{response} by #{created_by}")
+		log("Teacher #{message} => #{response} by #{created_by}", Logger::DEBUG) if$-d
 		@db.transaction do |db|
+			time = Time.now.to_i
 			unless db.get_first_value(SQL_GET_MESSAGE_ID, message)
-				db.execute(SQL_SET_MESSAGE, message, Time.now.to_i)
+				db.execute SQL_SET_MESSAGE, message, time
 			end
-			db.execute(SQL_SET_RESPONSE, response, created_by, Time.now.to_i, message)
+			db.execute SQL_SET_RESPONSE, response, created_by, time, message
 		end
 	end
 
 	def forget(message, index = nil)
-		debug("Forget #{message}")
+		log("Forget #{message}", Logger::DEBUG) if$-d
 		@db.transaction do |db|
-			db.execute(SQL_REMOVE_RESPONSES, message)
+			db.execute SQL_REMOVE_RESPONSES, message
 		end
 	end
 
 	def response(message, sender_nickname)
 		result = @db.execute(SQL_GET_RESPONSES, message).map{ |row| row[0] }.sample
-		result.gsub(/{我}|{你}/, '{我}' => @nickname, '{你}' => sender_nickname) if result
+		result.gsub(/\{我\}|\{你\}/, '{我}' => bot_name, '{你}' => sender_nickname) if result
 	end
 end

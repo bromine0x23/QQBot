@@ -83,56 +83,67 @@ MANUAL
 	def on_message(value)
 		log("message #{value}", Logger::DEBUG) if $-d
 		# 桩方法，处理 message 消息
+		nil
 	end
 
 	def on_group_message(value)
 		log("group_message #{value}", Logger::DEBUG) if $-d
 		# 桩方法，处理 group_message 事件
+		nil
 	end
 
 	def on_input_notify(value)
 		log("input_notify #{value}")
 		# 桩方法，处理 input_notify 消息
+		nil
 	end
 
 	def on_buddies_status_change(value)
 		log("buddies_status_change #{value}")
 		# 桩方法，处理 buddies_status_change 消息
+		nil
 	end
 
 	def on_sess_message(value)
 		log("sess_message #{value}")
 		# 桩方法，处理 sess_message 消息
+		nil
 	end
 
 	def on_kick_message(value)
 		log("kick_message #{value}")
 		# 桩方法，处理 kick_message 消息
+		nil
 	end
 
 	def on_group_web_message(value)
 		log("group_web_message #{value}")
 		# 桩方法，处理 group_web_message 消息
+		nil
 	end
 
 	def on_system_message(value)
 		log("system_message #{value}")
 		# 桩方法，处理 system_message 消息
+		nil
 	end
 
 	def on_sys_g_msg(value)
 		log("sys_g_msg #{value}")
 		# 桩方法，处理 sys_g_msg 消息
+		nil
+	end
+
+	def on_buddylist_change(value)
+		log("buddylist_change #{value}")
+		# 桩方法，处理 buddylist_change 消息
+		nil
 	end
 
 	protected
 
 	def log(message, level = Logger::INFO)
 		@logger.log(level, message, self.class.name)
-	end
-
-	def debug(message)
-		log(message, Logger::DEBUG) if $DEBUG
 	end
 
 	private
@@ -152,16 +163,24 @@ class PluginResponserBase < PluginBase
 	KEY_CONTENT = 'content'
 	KEY_TIME = 'time'
 
+	def response_header_with_nickname(nickname)
+		response = <<RESPONSE
+回 #{nickname} 大人：
+RESPONSE
+	end
+
 	def on_message(value)
 		super
 		uin = value[KEY_FROM_UIN]
-		deal_message(uin, @qqbot.qq_number(uin), @qqbot.friend_nickname(uin), value[KEY_CONTENT], Time.at(value[KEY_TIME]))
+		friend = @qqbot.friend(uin)
+		deal_message(uin, friend.qq_number, friend.nickname, value[KEY_CONTENT], value[KEY_TIME])
 	end
 
 	def on_group_message(value)
 		super
 		guin, uin = value[KEY_FROM_UIN], value[KEY_SEND_UIN]
-		deal_group_message(guin, @qqbot.qq_number(uin), @qqbot.group_nickname(guin, uin), value[KEY_CONTENT], Time.at(value[KEY_TIME]))
+		member = @qqbot.group_member(guin, uin)
+		deal_group_message(guin, member.qq_number, member.nickname, value[KEY_CONTENT], value[KEY_TIME])
 	end
 
 	def deal_message(uin, sender_qq, sender_nickname, content, time)
@@ -183,6 +202,10 @@ class PluginNicknameResponserBase < PluginResponserBase
 		@nickname = @qqbot.bot_name
 	end
 
+	def bot_name
+		@qqbot.bot_name
+	end
+
 	def deal_message(uin, sender_qq, sender_nickname, content, time)
 		super
 		response_or_ingnore(uin, sender_qq, sender_nickname, QQBot.message(content), time, @send_message)
@@ -190,7 +213,7 @@ class PluginNicknameResponserBase < PluginResponserBase
 
 	def deal_group_message(guin, sender_qq, sender_nickname, content, time)
 		super
-		response_or_ingnore(guin, sender_qq, sender_nickname, $~[:message].strip, time, @send_group_message) if /\s*@?#{@nickname}(?<message>.*)/ =~ QQBot.message(content)
+		response_or_ingnore(guin, sender_qq, sender_nickname, $~[:message].strip, time, @send_group_message) if /^\s*@?#{bot_name}(?<message>.*)/ =~ QQBot.message(content)
 	end
 
 	def response_or_ingnore(uin, sender_qq, sender_nickname, message, time, sender)

@@ -4,9 +4,9 @@
 require_relative 'plugin'
 
 class PluginSystem < PluginNicknameResponserBase
-	NAME = '管理员插件'
+	NAME = '系统插件'
 	AUTHOR = 'BR'
-	VERSION = '1.9'
+	VERSION = '1.10'
 	DESCRIPTION = '管理QQBot'
 	MANUAL = <<MANUAL
 ==> 系统插件 <==
@@ -134,14 +134,14 @@ RESPONSE
 						RESPONSE_PLUGIN_HELP % [plugin_name, plugin.manual.strip]
 					when COMMAND_ENABLE_PLUGIN
 						if @qqbot.master?(sender_qq)
-							@qqbot.enable_plugin(uin, plugin)
+							@qqbot.enable_plugin(uin, sender_qq, plugin)
 							RESPONSE_PLUGIN_ENABLED % plugin_name
 						else
 							NO_PERMISSION_ENABLE_PLUGIN
 						end
 					when COMMAND_DISABLE_PLUGIN
 						if @qqbot.master?(sender_qq)
-							@qqbot.disable_plugin(uin, plugin)
+							@qqbot.disable_plugin(uin, sender_qq, plugin)
 							RESPONSE_PLUGIN_DISABLED % plugin_name
 						else
 							NO_PERMISSION_DISABLE_PLUGIN

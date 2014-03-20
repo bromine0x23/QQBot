@@ -89,8 +89,7 @@ MANUAL
 RESPONSE
 				end
 			end
-			response << RESPONSE_NOT_UPDATED if response.empty?
-			header << response
+			header << (response.empty? ? RESPONSE_NOT_UPDATED : response)
 		end
 	end
 end

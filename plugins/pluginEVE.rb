@@ -31,7 +31,6 @@ MANUAL
 	MARKET_PATTERN  = /^市场\s*(?<item_names>.+)/
 	MINERAL_PATTERN = /^基础矿物$/i
 
-	URI_MARKET  = 'http://www.ceve-market.org/api/market/region/10000002/system/30000142/type/%d.json'
 	URI_MINERAL = 'http://www.ceve-market.org/api/evemon'
 
 	JSON_KEY_BUY, JSON_KEY_SELL  = 'buy', 'sell'
@@ -73,7 +72,7 @@ RESPONSE
 				response = response_header_with_nickname sender_nickname
 				$~[:item_names].split(PATTERN_ITEM_NAMES_SEPARATOR).each do |item_name|
 					if @items.has_key? item_name
-						json_data = JSON.parse(Net::HTTP.get(URI(URI_MARKET % @items[item_name])))
+						json_data = JSON.parse(Net::HTTP.get(URI("http://www.ceve-market.org/api/market/region/10000002/system/30000142/type/#{@items[item_name]}.json")))
 						buy  = json_data[JSON_KEY_BUY][JSON_KEY_MAX]
 						sell = json_data[JSON_KEY_SELL][JSON_KEY_MIN]
 						response << <<RESPONSE

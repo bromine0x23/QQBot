@@ -3,10 +3,13 @@
 
 require_relative 'plugin'
 
+require 'sqlite3'
+require 'yaml'
+
 class PluginCore < PluginNicknameResponserBase
 	NAME = '核心插件'
 	AUTHOR = 'BR'
-	VERSION = '1.12'
+	VERSION = '1.13'
 	DESCRIPTION = 'QQBot核心'
 	MANUAL = <<MANUAL.strip
 ==> 系统插件 <==
@@ -21,7 +24,19 @@ class PluginCore < PluginNicknameResponserBase
 MANUAL
 	PRIORITY = 8
 
-	DB_FILE = File.expand_path(File.dirname(__FILE__) + '/pluginCore.db')
+	def on_load
+		# super # FOR DEBUG
+		load_filter_list
+		open_db
+	end
+
+	def on_unload
+		# super # FOR DEBUG
+		save_filter_list
+		close_db
+	end
+
+	DB_FILE =file_path __FILE__, 'pluginCore.db'
 
 	TABLE_MESSAGES = 'messages'
 
@@ -57,16 +72,13 @@ INSERT INTO messages (
 ) VALUES (?, ?, ?, ?, ?, ?, ?)
 SQL
 
-	def on_load
-		# super # FOR DEBUG
-		log('连接数据库……')
+	def open_db
 		@db = SQLite3::Database.open DB_FILE
 		@db.execute SQL_CREATE_TABLE_MESSAGES if @db.get_first_value(SQL_CHECK_TABLE, TABLE_MESSAGES).zero?
 		log('数据库连接完毕')
 	end
 
-	def on_unload
-		# super # FOR DEBUG
+	def close_db
 		log('断开数据库连接')
 		@db.close
 	end
@@ -75,14 +87,16 @@ SQL
 		@db.transaction do |db|
 			db.execute SQL_INSERT_MESSAGE, TYPEID_MESSAGE, sender_qq, sender_nickname, sender_qq, sender_nickname, QQBot.message(content), time
 		end
+		return true if @filter_list.include? sender_qq
 		super
 	end
 
 	def deal_group_message(guin, sender_qq, sender_nickname, content, time)
 		group = @qqbot.group guin
 		@db.transaction do |db|
-			db.execute SQL_INSERT_MESSAGE, TYPEID_GROUP_MESSAGE, group.group_number, group.group_name, sender_qq, sender_nickname, QQBot.message(content), time
+			db.execute SQL_INSERT_MESSAGE, TYPEID_GROUP_MESSAGE, group.number, group.name, sender_qq, sender_nickname, QQBot.message(content), time
 		end
+		return true if @filter_list.include? sender_qq
 		super
 	end
 
@@ -114,15 +128,13 @@ SQL
 		friend = @qqbot.friend(uin)
 		case status
 		when STATUS_ONLINE
-			log("#{friend.nickname}(#{friend.qq_number}) 上线了")
-			# @send_message.call(uin, '正面上我！')
+			log("#{friend.name}(#{friend.number}) 上线了")
 		when STATUS_OFFLINE
-			log("#{friend.nickname}(#{friend.qq_number}) 下线了")
-			# @send_message.call(uin, '正面上我！')
+			log("#{friend.name}(#{friend.number}) 下线了")
 		when STATUS_AWAY
-			log("#{friend.nickname}(#{friend.qq_number}) 暂时离开")
+			log("#{friend.name}(#{friend.number}) 暂时离开")
 		when STATUS_SILENT
-			log("#{friend.nickname}(#{friend.qq_number}) 开始工作")
+			log("#{friend.name}(#{friend.number}) 开始工作")
 		else
 			log("未处理的状态 #{status}")
 		end
@@ -132,22 +144,28 @@ SQL
 	COMMAND_LIST_MASTERS         = '权限狗列表'
 	COMMAND_LIST_PLUGINS         = '插件列表'
 	COMMAND_LIST_PLUGIN_PRIORITY = '插件优先级'
-	COMMAND_ENABLE_PLUGIN        = '启用插件'
-	COMMAND_DISABLE_PLUGIN       = '停用插件'
 	COMMAND_RELOAD_CONFIG        = '重载配置'
 	COMMAND_RELOAD_PLUGINS       = '重载插件'
 	COMMAND_START_GC             = '垃圾回收'
 	COMMAND_START_DEBUG          = '开始调试'
 	COMMAND_END_DEBUG            = '结束调试'
-	COMMAND_HELP                 = '插件帮助'
+	COMMAND_FILTER_LIST          = '屏蔽列表'
 
-	COMMAND_PATTERN = /(?<command>#{COMMAND_HELP}|#{COMMAND_ENABLE_PLUGIN}|#{COMMAND_DISABLE_PLUGIN})\s*(?<plugin_name>.+)/
+	COMMAND_FILTER_PATTERN = /^(?<stop>停止|取消)?屏蔽\s*(?<qq_number>\d+)/
+
+	COMMAND_HELP           = '插件帮助'
+	COMMAND_ENABLE_PLUGIN  = '启用插件'
+	COMMAND_DISABLE_PLUGIN = '停用插件'
+	COMMAND_PLUGIN_PATTERN = /^(?<command>#{COMMAND_HELP}|#{COMMAND_ENABLE_PLUGIN}|#{COMMAND_DISABLE_PLUGIN})\s*(?<plugin_name>.+)/
+
 
 	NO_PERMISSION_RELOAD_CONFIG  = '重载配置：权限不足'
 	NO_PERMISSION_RELOAD_PLUGINS = '重载插件：权限不足'
 	NO_PERMISSION_START_GC       = '垃圾回收：权限不足'
 	NO_PERMISSION_START_DEBUG    = '开始调试：权限不足'
 	NO_PERMISSION_END_DEBUG      = '结束调试：权限不足'
+	NO_PERMISSION_FILTER_LIST    = '屏蔽列表：权限不足'
+	NO_PERMISSION_FILTER         = '屏蔽控制：权限不足'
 	NO_PERMISSION_ENABLE_PLUGIN  = '启用插件：权限不足'
 	NO_PERMISSION_DISABLE_PLUGIN = '停用插件：权限不足'
 
@@ -168,50 +186,55 @@ RESPONSE
 
 	MASTERS = 'BR'
 
+	FILE_FILTER_LIST = file_path __FILE__, 'pluginCore.yaml'
+
+	def load_filter_list
+		@filter_list = YAML.load_file(FILE_FILTER_LIST)
+	end
+
+	def save_filter_list
+		File.open(FILE_FILTER_LIST, 'w') do |file|
+			file << YAML.dump(@filter_list)
+		end
+	end
+
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		# super # FOR DEBUG
-
 		case message
 		when COMMAND_LIST_MASTERS
 			MASTERS
 		when COMMAND_LIST_PLUGINS
 			header = "已启用插件：\n"
 			body = ''
-			@qqbot.plugins.each do |plugin|
-				unless @qqbot.plugin_forbidden? uin, plugin
+			@qqbot.plugins(uin).each do |plugin|
 					body  << <<RESPONSE
 #{plugin.name}[#{plugin.author}<#{plugin.version}>]：#{plugin.description}
 RESPONSE
-				end
 			end
 			header << (body.empty? ? STRING_EMPTY : body)
 		when COMMAND_LIST_PLUGIN_PRIORITY
 			response = ''
-			@qqbot.plugins.each do |plugin|
-				unless @qqbot.plugin_forbidden? uin, plugin
-					response << "#{plugin.name} => #{plugin.priority}\n"
-				end
+			@qqbot.plugins(uin).each do |plugin|
+				response << "#{plugin.name} => #{plugin.priority}\n"
 			end
 			response
 		when COMMAND_RELOAD_CONFIG
 			if @qqbot.master? sender_qq
-				@qqbot.send :load_config
+				@qqbot.load_config
 				RESPONSE_CONFIG_RELOADED
 			else
 				NO_PERMISSION_RELOAD_CONFIG
 			end
 		when COMMAND_RELOAD_PLUGINS
 			if @qqbot.master? sender_qq
-				@qqbot.send :reload_plugins
-				# RESPONSE_GC_FINISHED % @qqbot.plugins.size
-				"插件已重载，共 #{@qqbot.plugins.size} 个插件"
+				num = @qqbot.reload_plugins
+				"插件已重载，共 #{num} 个插件"
 			else
 				NO_PERMISSION_RELOAD_PLUGINS
 			end
 		when COMMAND_START_GC
 			if @qqbot.master? sender_qq
 				GC.start
-				# RESPONSE_GC_FINISHED % GC.count
 				"垃圾回收运行完毕，已执行 #{GC.count} 次"
 			else
 				NO_PERMISSION_START_GC
@@ -221,7 +244,7 @@ RESPONSE
 				$-d = true
 				RESPONSE_DEBUG_STARTED
 			else
-				NO_PERMISSION_START_DEBUG
+				NO_PERMISSION_FILTER_LIST
 			end
 		when COMMAND_END_DEBUG
 			if @qqbot.master? sender_qq
@@ -230,30 +253,50 @@ RESPONSE
 			else
 				NO_PERMISSION_END_DEBUG
 			end
+		when COMMAND_FILTER_LIST
+			if @qqbot.administrator? uin, sender_qq
+				$-d = false
+				@filter_list.empty? ? STRING_EMPTY  : @filter_list.join("\n")
+			else
+				NO_PERMISSION_FILTER_LIST
+			end
 		else
-			if COMMAND_PATTERN =~ message
+			if COMMAND_FILTER_PATTERN =~ message
+				if @qqbot.administrator? uin, sender_qq
+					if $~[:stop]
+						qq_number = $~[:qq_number].to_i
+						@filter_list.delete qq_number
+						save_filter_list
+						"嗯，#{qq_number} 改过自新了"
+					else
+						qq_number = $~[:qq_number].to_i
+						@filter_list << qq_number unless @filter_list.include? qq_number
+						save_filter_list
+						"嗯，#{qq_number} 是坏人"
+					end
+				else
+					NO_PERMISSION_FILTER
+				end
+			elsif COMMAND_PLUGIN_PATTERN =~ message
 				plugin_name = $~[:plugin_name]
-				plugin = @qqbot.plugins.find{ |plugin| plugin.name == plugin_name }
+				plugin = @qqbot.plugin(plugin_name)
 				if plugin
 					case $~[:command]
 					when COMMAND_HELP
-						# RESPONSE_PLUGIN_HELP % [plugin_name, plugin.manual]
 						<<RESPONSE
 ==> #{plugin_name} 帮助 <==
 #{plugin.manual}
 RESPONSE
 					when COMMAND_ENABLE_PLUGIN
-						if @qqbot.master? sender_qq
+						if @qqbot.administrator? uin, sender_qq
 							@qqbot.enable_plugin uin, sender_qq, plugin
-							# RESPONSE_PLUGIN_ENABLED % plugin_name
 							"#{plugin_name} 已启用"
 						else
 							NO_PERMISSION_ENABLE_PLUGIN
 						end
 					when COMMAND_DISABLE_PLUGIN
-						if @qqbot.master? sender_qq
+						if @qqbot.administrator? uin, sender_qq
 							@qqbot.disable_plugin uin, sender_qq, plugin
-							# RESPONSE_PLUGIN_DISABLED % plugin_name
 							"#{plugin_name} 已停用"
 						else
 							NO_PERMISSION_DISABLE_PLUGIN
@@ -261,7 +304,6 @@ RESPONSE
 					else
 					end
 				else
-					# RESPONSE_UNKNOWN_PLUGIN % plugin_name
 					"未知插件 #{plugin_name}"
 				end
 			end

@@ -1,96 +1,208 @@
 #!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
-require 'yaml'
 require_relative 'webqq'
+require 'yaml'
+require 'set'
 # require_relative 'plugins/plugin'
 
 # $DEBUG = true
 
 class QQBot
-	CONFIG_FILE = 'config.yaml'
+	FILE_CONFIG = 'config.yaml'
+	FILE_PLUGIN_RULES = 'plugin_rules.yaml'
+	LOAD_PLUGINS_PATH = './plugins/plugin*.rb'
+
+	class PluginAdministrator
+		PATH_PLUGINS = './plugins/plugin*.rb'
+		FILE_RULES = 'plugin_rules.yaml'
+
+		attr_reader :plugins
+
+		def initialize(qqbot, logger)
+			@qqbot  = qqbot
+			@logger = logger
+			@plugins = []
+		end
+
+		def load_plugins
+			Dir.glob(PATH_PLUGINS) { |file_name| load file_name }
+			@plugins = []
+			PluginBase.plugins.each { |plugin_class|
+				begin
+					@plugins << plugin_class.new(@qqbot, @logger)
+				rescue Exception => ex
+					log(<<LOG, Logger::ERROR)
+载入插件 #{plugin_class::NAME} 时发生异常：#{ex}
+调用栈：
+#{ex.backtrace.join("\n")}
+LOG
+				end
+			}
+			@plugins.sort_by! { |plugin| -plugin.priority }
+			load_rules
+			log('插件载入完毕')
+			@plugins.size
+		end
+
+		def unload_plugins
+			save_rules
+			@plugins.each { |plugin| plugin.on_unload }
+			Object.constants.each do |symbol|
+				Object.send(:remove_const, symbol) if symbol != :PluginAdministrator and  /^Plugin*/ =~ symbol
+			end
+			log('插件卸载完毕')
+			true
+		end
+
+		def reload_plugins
+			unload_plugins
+			load_plugins
+			log('插件重载完毕')
+			@plugins.size
+		end
+
+		def load_rules
+			@rules = YAML.load_file FILE_RULES
+			@rules.default_proc = proc do |hash, key|
+				hash[key] = {
+					forbidden_list: Set.new,
+					administrators: Set.new
+				}
+			end
+		end
+
+		def save_rules
+			File.open(FILE_RULES, 'w') do |file|
+				file << YAML.dump(@rules)
+			end
+		end
+
+		def administrator?(group_number, qq_number)
+			@qqbot.master?(qq_number) or @rules[group_number][:administrators].include?(qq_number)
+		end
+
+		def enable_plugin(uin, qq_number, plugin)
+			entity = @qqbot.entity(uin)
+			if entity.is_a? WebQQClient::QQGroup
+				group_number = entity.number
+				@rules[group_number][:forbidden_list].delete(plugin.class.name) if administrator?(group_number, qq_number)
+			end
+			save_rules
+		end
+
+		def disable_plugin(uin, qq_number, plugin)
+			entity = @qqbot.entity(uin)
+			if entity.is_a? WebQQClient::QQGroup
+				group_number = entity.number
+				@rules[group_number][:forbidden_list].add(plugin.class.name) if administrator?(group_number, qq_number)
+			end
+			save_rules
+		end
+
+		def forbidden?(plugin_name, group_number)
+			@rules[group_number][:forbidden_list].include? plugin_name
+		end
+
+		def filtered_plugins(group_number)
+			@plugins.select do |plugin|
+				not forbidden?(plugin.class.name, group_number)
+			end
+		end
+
+		def on_event(data)
+			poll_type = data[KEY_POLL_TYPE]
+			value     = data[KEY_VALUE]
+			event     = :"on_#{poll_type}"
+			from_uin  = value[KEY_FROM_UIN]
+			from_entity = @qqbot.entity(from_uin)
+
+			@plugins.each do |plugin|
+				next if from_entity.is_a?(WebQQClient::QQGroup) and forbidden?(plugin.class.name, from_entity.number)
+				begin
+					break if plugin.send(event, value)
+				rescue Exception => ex
+					log(<<LOG, Logger::ERROR)
+执行插件 #{plugin.name} 时发生异常：#{ex}
+调用栈：
+#{ex.backtrace.join("\n")}
+LOG
+				end
+			end
+		end
+
+		private
+
+		def log(message, level = Logger::INFO)
+			@logger.log(level, message, self.class.name)
+		end
+	end
+
 	KEY_POLL_TYPE = 'poll_type'
 	KEY_VALUE = 'value'
 	KEY_FROM_UIN = 'from_uin'
 
 	attr_reader :bot_name
-	attr_reader :plugins
 	attr_reader :groups
 	attr_reader :friends
 	attr_reader :masters
+	attr_reader :plugin_adminsrator
 
 	def initialize
 		load_config
 		init_logger
-		load_plugins
-
 		@client = WebQQClient.new(@qq, @password, @logger, self.method(:on_captcha_need))
+		@plugin_adminsrator = PluginAdministrator.new(self, @logger)
+	end
+
+	def load_config
+		config = YAML.load_file(FILE_CONFIG)
+		common_config = config[:common]
+		@log_file = common_config[:log_file] || 'qqbot.log'
+		@captcha_file = common_config[:captcha_file] || 'captcha.jpg'
+		@qq, @password = common_config[:qq], common_config[:password]
+		raise Exception.new('未设置QQ号或密码') unless @qq and @password
+		@bot_name = common_config[:bot_name]
+		@masters = common_config[:masters]
+		@font_config = config[:font]
+	end
+
+	def init_logger
+		@logger = Logger.new(@log_file, File::WRONLY | File::APPEND | File::CREAT)
+		@logger.formatter = proc do |severity, datetime, prog_name, msg|
+			prog_name ? "[#{datetime}][#{severity}][#{prog_name}] #{msg}\n" : "[#{datetime}][#{severity}] #{msg}\n"
+		end
+		@logger
 	end
 
 	def run
+		log('开始运行……')
+		@client.login
+		@message_receiver = @client.receiver
+		@message_sender = @client.sender
+		load_plugins
+		refresh_entities
 		begin
-			log('开始运行……')
-			@client.login
-			@message_receiver = @client.receiver
-			@message_sender = @client.sender
-			refresh_entities
-			save_entities
-			begin
-				puts 'QQBot已成功登录！'
-				loop do
-					datas = @message_receiver.data
-					datas.each do |data|
-						log("data: #{data}", Logger::DEBUG) if $-d
-						poll_type = data[KEY_POLL_TYPE]
-						value     = data[KEY_VALUE]
-						event     = :"on_#{poll_type}"
-						from_uin  = value[KEY_FROM_UIN]
-
-						@plugins.each do |plugin|
-							next if plugin_forbidden?(from_uin, plugin)
-							begin
-								break if plugin.send(event, value)
-							rescue Exception => ex
-								log("执行插件 #{plugin.name} 时发生异常：#{ex}", Logger::ERROR)
-								log("调用栈：\n#{ex.backtrace.join("\n")}", Logger::ERROR)
-							end
-						end
-					end
+			puts 'QQBot已成功登录！'
+			loop do
+				datas = @message_receiver.data
+				datas.each do |data|
+					@plugin_adminsrator.on_event(data)
 				end
-			rescue Exception => ex
-				retry
 			end
 		ensure
+			save_entities
 			stop
-		end
-	end
-
-	def test
-		log('开始测试……')
-		begin
-			log('测试登录……')
-			@client.login
-
-			log('测试用户及群信息请求……')
-			File.open('test_data.txt', 'w') do |file|
-				file.puts @client.friends
-				file.puts @client.groups
-			end
-		rescue Exception => ex
-			log(ex)
-			log("调用栈：\n#{ex.backtrace.join("\n")}")
-		ensure
-			log('测试登出……')
-			@client.logout
 		end
 	end
 
 	def stop
 		@client.logout
-		@message_receiver, @message_sender = nil, nil
-		Thread.list.each do |thread|
-			thread.terminate if thread != Thread.main
-		end
+		@message_receiver.thread.kill
+		@message_receiver = nil
+		@message_sender.thread.kill
+		@message_sender = nil
+		unload_plugins
 	end
 
 	def send_message(uin, message, font = {})
@@ -102,39 +214,75 @@ class QQBot
 	end
 
 	def self.message(content)
-		content.select{ |item| item.is_a? String }.join.strip
+		message = ''
+		content.each do |item|
+			message << item if item.is_a? String
+		end
+		message.strip
+	end
+
+	def plugin(plugin_name)
+		@plugin_adminsrator.plugins.find{ |plugin| plugin.name == plugin_name }
+	end
+
+	def plugins(uin)
+		entity = entity uin
+		entity.is_a?(WebQQClient::QQGroup) ? @plugin_adminsrator.filtered_plugins(entity.number) : @plugin_adminsrator.plugins
+	end
+
+	def load_plugins
+		@plugin_adminsrator.load_plugins
+	end
+
+	def unload_plugins
+		@plugin_adminsrator.unload_plugins
+	end
+
+	def reload_plugins
+		@plugin_adminsrator.reload_plugins
 	end
 
 	def enable_plugin(uin, qq_number, plugin)
-		if @forbidden.has_key? uin
-			@forbidden[uin].delete(plugin.class.name)
-		end
+		@plugin_adminsrator.enable_plugin(uin, qq_number, plugin)
+		true
 	end
 
 	def disable_plugin(uin, qq_number, plugin)
-		if @forbidden.has_key? uin
-			@forbidden[uin] << plugin.class.name unless @forbidden[uin].include? plugin.class.name
-		else
-			@forbidden[uin] = [plugin.class.name]
-		end
+		@plugin_adminsrator.disable_plugin(uin, qq_number, plugin)
+		true
 	end
 
-	def plugin_forbidden?(uin, plugin)
-		@forbidden.has_key? uin and @forbidden[uin].include? plugin.class.name
+	# @return [TrueClass or FalseClass]
+	def forbidden?(plugin_name, uin)
+		entity = entity uin
+		entity.is_a?(WebQQClient::QQGroup) and @plugin_adminsrator.forbidden?(plugin_name, entity.number)
+	end
+
+	def administrator?(uin, qq_number)
+		entity = entity uin
+		entity.is_a?(WebQQClient::QQGroup) and @plugin_adminsrator.administrator?(entity.number, qq_number) or master?(qq_number)
 	end
 
 	def master?(qq_number)
 		@masters.include? qq_number
 	end
 
+	# @return [WebQQClient::QQEntity]
+	def entity(uin)
+		@entities[uin]
+	end
+
+	# @return [WebQQClient::QQFriend]
 	def friend(uin)
 		@friends[uin]
 	end
 
+	# @return [WebQQClient::QQGroup]
 	def group(guin)
 		@groups[guin]
 	end
 
+	# @return [WebQQClient::QQGroupMember]
 	def group_member(guin, uin)
 		@groups[guin].member(uin)
 	end
@@ -143,10 +291,10 @@ class QQBot
 		friends, groups = @client.friends, @client.groups
 		@friends, @groups = {}, {}
 		friends.each do |friend|
-			@friends[friend.uin] = friend unless @friends[friend.uin]
+			@friends[friend.uin] = friend
 		end
 		groups.each do |group|
-			@groups[group.uin] = group unless @groups[group.uin]
+			@groups[group.uin] = group
 		end
 
 		@entities = @friends.merge @groups
@@ -155,11 +303,10 @@ class QQBot
 	end
 
 	# @return [WebQQClient::QQFriend]
-	def add_friend(uin)
-		new_friend = @client.add_friend(uin)
+	def add_friend(qq_number)
+		new_friend = @client.add_friend(qq_number)
 		@friends[new_friend.uin] = new_friend
 	end
-
 
 	# @return [WebQQClient::QQFriend]
 	def delete_friend(uin)
@@ -172,70 +319,18 @@ class QQBot
 		@logger.log(level, message, self.class.name)
 	end
 
-	def load_config
-		config = YAML.load_file(CONFIG_FILE)
-		common_config = config['common']
-		@log_file = common_config['log_file'] || 'qqbot.log'
-		@captcha_file = common_config['captcha_file'] || 'captcha.jpg'
-		@qq, @password = common_config['qq'], common_config['password']
-		raise Exception.new('未设置QQ号或密码') if not @qq or not @password
-		@bot_name = common_config['bot_name']
-		@masters = common_config['masters']
-		@font_config = config['font']
-	end
-
-	LOAD_PLUGINS_PATH = './plugins/plugin*.rb'
-
-	def load_plugins
-		log('载入插件……')
-		Dir.glob(LOAD_PLUGINS_PATH) { |file_name| load file_name }
-		@plugins = []
-		PluginBase.plugins.each { |plugin_class|
-			begin
-				@plugins << plugin_class.new(self, @logger)
-			rescue Exception => ex
-				log("载入插件 #{plugin_class::NAME} 时发生异常：#{ex}", Logger::ERROR)
-				log("调用栈：\n#{ex.backtrace.join("\n")}", Logger::ERROR)
-			end
-		}
-		@plugins.sort_by { |plugin| -plugin.priority }
-		load_plugin_config
-		log('插件载入完毕')
-	end
-
-	def reload_plugins
-		log('重载插件')
-		@plugins.each do |plugin| plugin.on_unload end
-		Module.constants.select { |symbol| Object.send :remove_const, symbol if /^Plugin*/ =~ symbol }
-		load_plugins
-		log('插件重载完毕……')
-	end
-
-	def load_plugin_config
-		# TODO this is 坑
-		@forbidden = {}
-	end
-
-	def init_logger
-		@logger = Logger.new(@log_file, File::WRONLY | File::APPEND | File::CREAT)
-		@logger.formatter = proc do |severity, datetime, prog_name, msg|
-			prog_name ? "[#{datetime}][#{severity}][#{prog_name}] #{msg}\n" : "[#{datetime}][#{severity}] #{msg}\n"
-		end
-		@logger
-	end
-
 	def save_entities
 		File.open('entities.txt', 'w') do |file|
 			@entities.each do |uid, entity|
 				if entity.is_a? WebQQClient::QQGroup
 					file << <<ENTITY << <<MEMBERS
-QQ群：#{entity.group_name}(#{entity.group_number}) => #{uid}
+QQ群：#{entity} => #{uid}
 ENTITY
-#{entity.members.map{|member| "#{member.nickname}(#{member.qq_number}) => #{member.uid}"}.join('\n') }
+#{entity.members.map{|member| "#{member} => #{member.uid}"}.join('\n') }
 MEMBERS
 				elsif entity.is_a? WebQQClient::QQFriend
 					file << <<ENTITY
-QQ用户：#{entity.nickname}(#{entity.qq_number}) => #{uid}
+QQ用户：#{entity} => #{uid}
 ENTITY
 				end
 			end
@@ -273,8 +368,6 @@ loop do
 		end
 
 		retry
-	ensure
-		qqbot.stop
 	end
 end
 #=end

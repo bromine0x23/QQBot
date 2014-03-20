@@ -6,7 +6,7 @@ require_relative 'plugin'
 class PluginMC < PluginNicknameResponserBase
 	NAME = 'MC插件'
 	AUTHOR = 'BR'
-	VERSION = '1.3'
+	VERSION = '1.4'
 	DESCRIPTION = 'MC合成表查询'
 	MANUAL = <<MANUAL
 == 合成表查询 ==
@@ -14,7 +14,7 @@ MC 合成 <物品>（用逗号(,，)分割）
 MANUAL
 	PRIORITY = 0
 
-	CONFIG_FILE = File.expand_path(File.dirname(__FILE__) + '/pluginMC.yaml')
+	CONFIG_FILE = file_path __FILE__, 'pluginMC.yaml'
 
 	# COMMAND_PATTERN = /^MC\s*(?<command>.+)/i
 	# RECIPE_PATTERN = /^合成\s*(?<item_names>.+)/i
@@ -25,10 +25,9 @@ MANUAL
 
 	def on_load
 		# super # FOR DEBUG
-		log('加载数据……')
 		yaml_data = YAML.load_file CONFIG_FILE
 		@alias, @recipes = yaml_data['alias'], yaml_data['recipe']
-		log('加载完毕')
+		log('合成表数据加载完毕')
 	end
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)

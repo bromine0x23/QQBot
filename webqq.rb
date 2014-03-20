@@ -102,6 +102,8 @@ class WebQQClient
 	class MessageReceiver
 		TIMEOUT = 120
 
+		attr_reader :thread
+
 		# 创建接收线程
 		def initialize(client_id, p_session_id ,cookies, logger)
 			@logger = logger
@@ -167,6 +169,8 @@ LOG
 		STRING_FONT = 'font'
 		DEFAULT_FONT_FACE = '宋体'
 		DEFAULT_COLOR = '000000'
+
+		attr_reader :thread
 
 		# 创建发送线程
 		def initialize(cookies, logger, client_id1, p_session_id1)
@@ -305,79 +309,70 @@ LOG
 		end
 	end
 
-	# QQ好友类
-	class QQFriend
-		attr_reader :uin, :qq_number, :info, :nickname
+	class QQEntity
+		TYPE = 'QQ实体'
 
-		# @param [WebQQClient] client
-		def initialize(client, uin, markname = nil)
-			@uin = uin
-			@nickname = markname
-			@qq_number = client.fetch_qq_number(uin)
-			@info = client.fetch_friend_info(uin)
-			@nickname = @info[JSON_KEY_NICK] unless @nickname
-		end
+		attr_reader :uin, :name, :number
 
-		# 使用幽灵方法访问各属性
-		# Example: birthday_month ==> @info['birthday']['month']
-		def method_missing(symbol)
-			res = @info
-			symbol.to_s.split('_').each do |key|
-				res = res[key]
-				break unless res
-			end
-			res
+		def initialize(uin, name, number)
+			@uin    = uin
+			@name   = name
+			@number = number
 		end
 
 		def to_s
-			"#{@nickname}(#{@qq_number})"
+			"#{self.class::TYPE}#{@name}(#{@number})"
 		end
 	end
 
-	class QQGroupMember
-		attr_reader :uin, :qq_number, :nickname
+	# QQ好友类
+	class QQFriend < QQEntity
+		TYPE = 'QQ好友'
+
+		# attr_reader :info
+
+		# @param [WebQQClient] client
+		def initialize(client, uin, markname)
+			num = client.fetch_qq_number(uin)
+			# @info = client.fetch_friend_info(uin)
+			super(uin, markname, num)
+		end
+	end
+
+	class QQGroupMember < QQEntity
+		TYPE = 'QQ群成员'
 
 		# @param [WebQQClient] client
 		def initialize(client, uin, card = nil)
-			@uin = uin
-			@nickname = card
-			@qq_number = client.fetch_qq_number(uin)
-		end
-
-		def to_s
-			"#{@nickname}(#{@qq_number})"
+			super(uin, card, client.fetch_qq_number(uin))
 		end
 	end
 
 	# QQ群类
-	class QQGroup
-		attr_reader :uin, :group_code, :group_name, :group_number, :group_info, :members
+	class QQGroup < QQEntity
+		TYPE = 'QQ群'
+
+		attr_reader :code, :info, :members
 
 		# @param [WebQQClient] client
-		def initialize(client, uin, group_code, group_name)
+		def initialize(client, uin, code, name)
 			@client = client
-			@uin = uin
-			@group_code, @group_name = group_code, group_name
-			@group_number = client.fetch_group_number(group_code)
-			@group_info = client.fetch_group_info(group_code)
-			@nicknames = {}
-			@group_info[JSON_KEY_MINFO].each do |member|
-				@nicknames[member[JSON_KEY_UIN]] = member[JSON_KEY_NICK]
-			end
-			@group_info[JSON_KEY_CARDS].each do |card|
-				@nicknames[card[JSON_KEY_MUIN]] = card[JSON_KEY_CARD]
-			end
+			@code = code
+			super(uin, name, @client.fetch_group_number(@code))
+			@info = client.fetch_group_info(code)
 			@members = {}
+			@member_names = {}
+			@info[JSON_KEY_MINFO].each do |member|
+				@member_names[member[JSON_KEY_UIN]] = member[JSON_KEY_NICK]
+			end
+			@info[JSON_KEY_CARDS].each do |card|
+				@member_names[card[JSON_KEY_MUIN]] = card[JSON_KEY_CARD]
+			end
 		end
 
 		def member(uin)
 			return @members[uin] if @members[uin]
-			@members[uin] = QQGroupMember.new(@client, uin, @nicknames[uin])
-		end
-
-
-		def to_s
-			"#{@group_name}(#{@group_number})"
+			@members[uin] = QQGroupMember.new(@client, uin, @member_names[uin])
 		end
 	end
 
@@ -667,12 +662,19 @@ LOG
 		)
 		json_data = util_post_request(raw_data, URI_GET_USER_FRIENDS)
 		marknames = json_data[JSON_KEY_MARKNAMES]
+		info = json_data[JSON_KEY_INFO]
 		friends = []
 		json_data[JSON_KEY_FRIENDS].each do |friend|
 			uin = friend[JSON_KEY_UIN]
 			markname = marknames.find{|t| t[JSON_KEY_UIN] == uin }
-			markname = markname[JSON_KEY_MARKNAME] if markname
-			friends << QQFriend.new(self, uin, markname)
+			name = nil
+			if markname
+				name = markname[JSON_KEY_MARKNAME]
+			else
+				nickname = info.find{|t| t[JSON_KEY_UIN] == uin }
+				name = nickname[JSON_KEY_NICK]
+			end
+			friends << QQFriend.new(self, uin, name)
 		end
 		friends
 	end
@@ -715,7 +717,8 @@ LOG
 		uri = URI::HTTP.build(
 			host: HOST_S_WEB2_QQ,
 			path: PATH_GET_GROUP_NUMBER,
-			query: URI.encode_www_form(tuin: uin,
+			query: URI.encode_www_form(
+				tuin: uin,
 				verifysession: nil,
 				type: 4,
 				code: nil,

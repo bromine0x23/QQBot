@@ -8,7 +8,7 @@ require 'sqlite3'
 class PluginAI < PluginNicknameResponserBase
 	NAME = 'AI插件'
 	AUTHOR = 'BR'
-	VERSION = '1.8'
+	VERSION = '1.9'
 	DESCRIPTION = '人家才不是AI呢'
 	MANUAL = <<MANUAL.strip!
 == 复述 ==
@@ -30,7 +30,7 @@ class PluginAI < PluginNicknameResponserBase
 MANUAL
 	PRIORITY = -8
 
-	DB_FILE = File.expand_path(File.dirname(__FILE__) + '/pluginAI.db')
+	DB_FILE = file_path __FILE__, 'pluginAI.db'
 
 	SQL_CREATE_TABLE_MESSAGES = <<SQL
 CREATE TABLE messages (
@@ -115,7 +115,6 @@ SQL
 
 	def on_load
 		# super # FOR DEBUG
-		log('连接数据库……')
 		@db = SQLite3::Database.open DB_FILE
 		@db.execute SQL_CREATE_TABLE_MESSAGES if @db.get_first_value(SQL_CHECK_TABLE, TABLE_MESSAGES).zero?
 		if @db.get_first_value(SQL_CHECK_TABLE, TABLE_RESPONSES).zero?

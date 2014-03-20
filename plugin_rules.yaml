@@ -1,0 +1,6 @@
+---
+12345:
+  :forbidden_list: !ruby/object:Set
+    hash: {}
+  :administrators: !ruby/object:Set
+    hash: {}

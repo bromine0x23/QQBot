@@ -25,7 +25,7 @@ EVE 基础矿物
 MANUAL
 	PRIORITY = 0
 
-	CONFIG_FILE = File.expand_path(File.dirname(__FILE__) + '/pluginEVE.yaml')
+	CONFIG_FILE = file_path __FILE__, 'pluginEVE.yaml'
 	
 	COMMAND_PATTERN = /^EVE\s*(?<command>.+)/i
 	MARKET_PATTERN  = /^市场\s*(?<item_names>.+)/
@@ -46,9 +46,8 @@ MANUAL
 
 	def on_load
 		# super # FOR DEBUG
-		log('加载物品名数据……')
 		@items = YAML.load_file CONFIG_FILE
-		log('加载完毕')
+		log('物品名数据加载完毕')
 	end
 
 	def format_price(price)

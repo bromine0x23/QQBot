@@ -11,9 +11,14 @@ MANUAL
 	PRIORITY = 0
 
 	@@plugins = []
+	@@sub_plugins = []
 
 	def self.plugins
 		@@plugins
+	end
+
+	def self.sub_plugins
+		@@sub_plugins
 	end
 
 	# @param [QQBot] qqbot
@@ -24,7 +29,6 @@ MANUAL
 		@send_message = @qqbot.method(:send_message)
 		@send_group_message = @qqbot.method(:send_group_message)
 
-		log('初始化……')
 		on_load
 		log('初始化完毕')
 	end
@@ -99,7 +103,7 @@ MANUAL
 	end
 
 	def on_buddies_status_change(value)
-		log("buddies_status_change #{value}")
+		log("buddies_status_change #{value}", Logger::DEBUG) if $-d
 		# 桩方法，处理 buddies_status_change 消息
 		nil
 	end
@@ -146,11 +150,16 @@ MANUAL
 		@logger.log(level, message, self.class.name)
 	end
 
+	def self.file_path(source_path, file_name)
+		File.expand_path "#{File.dirname(source_path)}/#{file_name}"
+	end
+
 	private
 
 	STR_BASE = 'Base'
 
 	def self.inherited(subclass)
+		@@sub_plugins.unshift subclass
 		@@plugins << subclass unless subclass.name.end_with? STR_BASE
 	end
 end
@@ -170,17 +179,17 @@ RESPONSE
 	end
 
 	def on_message(value)
-		super
+		# super # FOR DEBUG
 		uin = value[KEY_FROM_UIN]
 		friend = @qqbot.friend(uin)
-		deal_message(uin, friend.qq_number, friend.nickname, value[KEY_CONTENT], value[KEY_TIME])
+		deal_message(uin, friend.number, friend.name, value[KEY_CONTENT], value[KEY_TIME])
 	end
 
 	def on_group_message(value)
-		super
+		# super # FOR DEBUG
 		guin, uin = value[KEY_FROM_UIN], value[KEY_SEND_UIN]
 		member = @qqbot.group_member(guin, uin)
-		deal_group_message(guin, member.qq_number, member.nickname, value[KEY_CONTENT], value[KEY_TIME])
+		deal_group_message(guin, member.number, member.name, value[KEY_CONTENT], value[KEY_TIME])
 	end
 
 	def deal_message(uin, sender_qq, sender_nickname, content, time)

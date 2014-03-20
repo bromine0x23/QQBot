@@ -6,9 +6,9 @@ require_relative 'plugin'
 class PluginMC < PluginNicknameResponserBase
 	NAME = 'MC插件'
 	AUTHOR = 'BR'
-	VERSION = '1.4'
+	VERSION = '1.5'
 	DESCRIPTION = 'MC合成表查询'
-	MANUAL = <<MANUAL
+	MANUAL = <<MANUAL.strip
 == 合成表查询 ==
 MC 合成 <物品>（用逗号(,，)分割）
 MANUAL
@@ -27,7 +27,7 @@ MANUAL
 		# super # FOR DEBUG
 		yaml_data = YAML.load_file CONFIG_FILE
 		@alias, @recipes = yaml_data['alias'], yaml_data['recipe']
-		log('合成表数据加载完毕')
+		log('合成表数据加载完毕', Logger::DEBUG) if $-d
 	end
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)

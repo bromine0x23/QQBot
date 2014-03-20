@@ -121,12 +121,12 @@ SQL
 			@db.execute SQL_CREATE_TABLE_RESPONSES
 			@db.execute SQL_CREATE_INDEX_ON_RESPONSES
 		end
-		log('数据库连接完毕')
+		log('数据库连接完毕', Logger::DEBUG) if $-d
 	end
 
 	def on_unload
 		# super # FOR DEBUG
-		log('断开数据库连接')
+		log('断开数据库连接', Logger::DEBUG) if $-d
 		@db.close
 	end
 

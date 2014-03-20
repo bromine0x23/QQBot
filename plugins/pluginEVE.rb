@@ -47,7 +47,7 @@ MANUAL
 	def on_load
 		# super # FOR DEBUG
 		@items = YAML.load_file CONFIG_FILE
-		log('物品名数据加载完毕')
+		log('物品名数据加载完毕', Logger::DEBUG) if $-d
 	end
 
 	def format_price(price)

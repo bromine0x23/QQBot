@@ -75,11 +75,11 @@ SQL
 	def open_db
 		@db = SQLite3::Database.open DB_FILE
 		@db.execute SQL_CREATE_TABLE_MESSAGES if @db.get_first_value(SQL_CHECK_TABLE, TABLE_MESSAGES).zero?
-		log('数据库连接完毕')
+		log('数据库连接完毕', Logger::DEBUG) if $-d
 	end
 
 	def close_db
-		log('断开数据库连接')
+		log('断开数据库连接', Logger::DEBUG) if $-d
 		@db.close
 	end
 
@@ -112,7 +112,7 @@ SQL
 			true
 		end
 	end
-
+=begin
 	STATUS_ONLINE  = 'online'
 	STATUS_OFFLINE = 'offline'
 	STATUS_AWAY    = 'away'
@@ -140,7 +140,7 @@ SQL
 		end
 		true
 	end
-
+=end
 	COMMAND_LIST_MASTERS         = '权限狗列表'
 	COMMAND_LIST_PLUGINS         = '插件列表'
 	COMMAND_LIST_PLUGIN_PRIORITY = '插件优先级'

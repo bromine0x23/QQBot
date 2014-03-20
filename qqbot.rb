@@ -14,7 +14,7 @@ class QQBot
 	LOAD_PLUGINS_PATH = './plugins/plugin*.rb'
 
 	class PluginAdministrator
-		PATH_PLUGINS = './plugins/plugin*.rb'
+		PATH_PLUGINS = './plugins/plugin?*.rb'
 		FILE_RULES = 'plugin_rules.yaml'
 
 		attr_reader :plugins
@@ -41,7 +41,7 @@ LOG
 			}
 			@plugins.sort_by! { |plugin| -plugin.priority }
 			load_rules
-			log('插件载入完毕')
+			log('插件载入完毕', Logger::DEBUG) if $-d
 			@plugins.size
 		end
 
@@ -51,14 +51,14 @@ LOG
 			Object.constants.each do |symbol|
 				Object.send(:remove_const, symbol) if symbol != :PluginAdministrator and  /^Plugin*/ =~ symbol
 			end
-			log('插件卸载完毕')
+			log('插件卸载完毕', Logger::DEBUG) if $-d
 			true
 		end
 
 		def reload_plugins
 			unload_plugins
 			load_plugins
-			log('插件重载完毕')
+			log('插件重载完毕', Logger::DEBUG) if $-d
 			@plugins.size
 		end
 

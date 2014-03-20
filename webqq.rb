@@ -110,7 +110,7 @@ class WebQQClient
 			@messages= Queue.new
 			@thread = Thread.new do
 				begin
-					log('线程启动……')
+					log('线程启动……', Logger::DEBUG) if $-d
 					http = Net::HTTP.start(HOST_D_WEB2_QQ, read_timeout: TIMEOUT)
 					request = Net::HTTP::Post.new(
 						'/channel/poll2',
@@ -178,7 +178,7 @@ LOG
 			@messages= Queue.new
 			@thread = Thread.new(client_id1, p_session_id1) do |client_id, p_session_id|
 				begin
-					log('线程启动……')
+					log('线程启动……', Logger::DEBUG) if $-d
 					https = Net::HTTP.start(HOST_D_WEB2_QQ, 443, use_ssl: true, verify_mode: OpenSSL::SSL::VERIFY_NONE)
 					init_header = {
 						HEADER_KEY_USER_AGENT => HEADER_USER_AGENT,
@@ -232,7 +232,7 @@ LOG
 								next
 							end
 						rescue EOFError
-							log('网络异常，无法发送消息，重试……')
+							log('网络异常，无法发送消息，重试……', Logger::ERROR)
 							retry
 						end
 					end
@@ -392,14 +392,14 @@ LOG
 	# 登录
 	def login
 		return if @logined
-		log('开始登陆……')
+		log('开始登陆……', Logger::DEBUG) if $-d
 
 		@random_key = Random.rand
 		@client_id  = Random.rand(10000000...100000000) # 客户端id
 
 		begin
 			# 第一次握手
-			log('拉取验证信息……')
+			log('拉取验证信息……', Logger::DEBUG) if $-d
 			uri = URI::HTTPS.build(
 				host: HOST_SSL_PTLOGIN2_QQ,
 				path: '/check',
@@ -419,7 +419,7 @@ LOG
 
 			if need_verify != '0'
 				# 需要验证码
-				log('获取验证码……')
+				log('获取验证码……', Logger::DEBUG) if $-d
 				uri = URI::HTTPS.build(
 					host: 'ssl.captcha.qq.com',
 					path: '/getimage',
@@ -430,16 +430,16 @@ LOG
 					)
 				)
 				verify_code = @on_captcha_need.call(@net_helper.get(uri))
-				log("验证码： #{verify_code}")
+				log("验证码： #{verify_code}", Logger::DEBUG) if $-d
 			end
 
 			#加密密码
-			log('加密密码……')
+			log('加密密码……', Logger::DEBUG) if $-d
 			password_encrypted = PasswordEncrypt.encrypt(@password, verify_code, key)
 			log("密码加密为：#{password_encrypted}", Logger::DEBUG) if $-d
 
 			# 验证账号
-			log('验证账号……')
+			log('验证账号……', Logger::DEBUG) if $-d
 			uri = URI::HTTPS.build(
 				host: HOST_SSL_PTLOGIN2_QQ,
 				path: '/login',
@@ -473,17 +473,17 @@ LOG
 			state = state.to_i
 			@nickname = nickname.force_encoding('utf-8')
 			raise LoginFailed.new(state, info) unless state.zero?
-			log("账号验证成功，昵称：#{@nickname}")
+			log("账号验证成功，昵称：#{@nickname}", Logger::DEBUG) if $-d
 
 			# 连接给定地址获得cookie
-			log('获取cookie……')
+			log('获取cookie……', Logger::DEBUG) if $-d
 			@net_helper.get(URI(address))
 			@ptwebqq = @net_helper.cookies[COOKIE_KEY_PTWEBQQ]
 
 			@net_helper.add_header(HEADER_KEY_REFERER, HEADER_REFERER)
 
 			# 获取会话数据
-			log('正在登陆……')
+			log('正在登陆……', Logger::DEBUG) if $-d
 			json_data = JSON.parse(
 				@net_helper.post(
 					URI('https://d.web2.qq.com/channel/login2'),
@@ -504,7 +504,7 @@ LOG
 			@p_session_id = session_data[JSON_KEY_PSESSIONID]
 			@uin          = session_data[JSON_KEY_UIN]
 			@verify_webqq = session_data[JSON_KEY_VFWEBQQ]
-			log('登陆成功')
+			log('登陆成功', Logger::DEBUG) if $-d
 		rescue LoginFailed => ex
 			case ex.state
 			when 3
@@ -530,7 +530,7 @@ LOG
 	PATH_LOGOUT = '/channel/logout2'
 	def logout
 		return unless @logined
-		log('开始登出……')
+		log('开始登出……', Logger::DEBUG) if $-d
 		uri = URI::HTTPS.build(
 			host: HOST_D_WEB2_QQ,
 			path: PATH_LOGOUT,
@@ -544,7 +544,7 @@ LOG
 		ret = 0
 		begin
 			util_get_json_data_result(uri)
-			log('登出成功！')
+			log('登出成功！', Logger::DEBUG) if $-d
 		rescue ErrorCode => ex
 			log("登出失败！(返回码=#{ex.error_code},返回信息=#{ex.raw_data['result']})")
 			ret = ex.error_code
@@ -557,10 +557,6 @@ LOG
 
 	def log(message, level = Logger::INFO)
 		@logger.log(level, message, self.class.name)
-	end
-
-	def debug(message)
-		log(message, Logger::DEBUG) if $DEBUG
 	end
 
 	# HTTP POST 请求

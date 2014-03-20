@@ -30,7 +30,7 @@ MANUAL
 		@send_group_message = @qqbot.method(:send_group_message)
 
 		on_load
-		log('初始化完毕')
+		log('初始化完毕', Logger::DEBUG) if $-d
 	end
 
 	def name
@@ -117,31 +117,31 @@ MANUAL
 	def on_kick_message(value)
 		log("kick_message #{value}")
 		# 桩方法，处理 kick_message 消息
-		nil
+		true
 	end
 
 	def on_group_web_message(value)
 		log("group_web_message #{value}")
 		# 桩方法，处理 group_web_message 消息
-		nil
+		true
 	end
 
 	def on_system_message(value)
 		log("system_message #{value}")
 		# 桩方法，处理 system_message 消息
-		nil
+		true
 	end
 
 	def on_sys_g_msg(value)
 		log("sys_g_msg #{value}")
 		# 桩方法，处理 sys_g_msg 消息
-		nil
+		true
 	end
 
 	def on_buddylist_change(value)
 		log("buddylist_change #{value}")
 		# 桩方法，处理 buddylist_change 消息
-		nil
+		true
 	end
 
 	protected

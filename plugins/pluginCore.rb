@@ -3,11 +3,11 @@
 
 require_relative 'plugin'
 
-class PluginSystem < PluginNicknameResponserBase
-	NAME = '系统插件'
+class PluginCore < PluginNicknameResponserBase
+	NAME = '核心插件'
 	AUTHOR = 'BR'
-	VERSION = '1.11'
-	DESCRIPTION = '管理QQBot'
+	VERSION = '1.12'
+	DESCRIPTION = 'QQBot核心'
 	MANUAL = <<MANUAL.strip
 ==> 系统插件 <==
 == 列出管理员 ==
@@ -19,22 +19,115 @@ class PluginSystem < PluginNicknameResponserBase
 == 显示插件帮助 ==
 插件帮助 <插件>
 MANUAL
-=begin
-== [插件管理员]启用插件 ==
-开启插件 <插件>
-== [插件管理员]关闭插件 ==
-关闭插件 <插件>
-== [系统管理员]启动垃圾回收 ==
-垃圾回收
-== [系统管理员]重载插件 ==
-重载插件
-== [系统管理员]重载配置 ==
-重载配置
-== [系统管理员]重载插件规则 ==
-重载插件规则
-MANUAL
-=end
 	PRIORITY = 8
+
+	DB_FILE = File.expand_path(File.dirname(__FILE__) + '/pluginCore.db')
+
+	TABLE_MESSAGES = 'messages'
+
+	TYPEID_MESSAGE       = 0
+	TYPEID_GROUP_MESSAGE = 1
+
+	SQL_CREATE_TABLE_MESSAGES = <<SQL
+CREATE TABLE messages (
+	id           INTEGER PRIMARY KEY AUTOINCREMENT,
+	message_type INTEGER,
+	from_number  INTEGER,
+	from_name    TEXT,
+	send_number  INTEGER,
+	send_name    TEXT,
+	message      TEXT,
+	created_at   TIMESTAMP
+)
+SQL
+
+	SQL_CHECK_TABLE = <<SQL
+SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?
+SQL
+
+	SQL_INSERT_MESSAGE = <<SQL
+INSERT INTO messages (
+	message_type,
+	from_number,
+	from_name,
+	send_number,
+	send_name,
+	message,
+	created_at
+) VALUES (?, ?, ?, ?, ?, ?, ?)
+SQL
+
+	def on_load
+		# super # FOR DEBUG
+		log('连接数据库……')
+		@db = SQLite3::Database.open DB_FILE
+		@db.execute SQL_CREATE_TABLE_MESSAGES if @db.get_first_value(SQL_CHECK_TABLE, TABLE_MESSAGES).zero?
+		log('数据库连接完毕')
+	end
+
+	def on_unload
+		# super # FOR DEBUG
+		log('断开数据库连接')
+		@db.close
+	end
+
+	def deal_message(uin, sender_qq, sender_nickname, content, time)
+		@db.transaction do |db|
+			db.execute SQL_INSERT_MESSAGE, TYPEID_MESSAGE, sender_qq, sender_nickname, sender_qq, sender_nickname, QQBot.message(content), time
+		end
+		super
+	end
+
+	def deal_group_message(guin, sender_qq, sender_nickname, content, time)
+		group = @qqbot.group guin
+		@db.transaction do |db|
+			db.execute SQL_INSERT_MESSAGE, TYPEID_GROUP_MESSAGE, group.group_number, group.group_name, sender_qq, sender_nickname, QQBot.message(content), time
+		end
+		super
+	end
+
+	JSON_KEY_TYPE    = 'type'
+	JSON_KEY_ACCOUNT = 'account'
+	STRING_VERIFY_REQUIRED = 'verify_required'
+
+	def on_system_message(value)
+		# super # FOR DEBUG
+		if value[JSON_KEY_TYPE] == STRING_VERIFY_REQUIRED
+			new_friend = @qqbot.add_friend value[JSON_KEY_ACCOUNT]
+			log("和#{new_friend.nickname}（#{new_friend.qq_number}）成为了好友")
+			true
+		end
+	end
+
+	STATUS_ONLINE  = 'online'
+	STATUS_OFFLINE = 'offline'
+	STATUS_AWAY    = 'away'
+	STATUS_SILENT  = 'silent'
+
+	JSON_KEY_UIN    = 'uin'
+	JSON_KEY_STATUS = 'status'
+
+	def on_buddies_status_change(value)
+		super # FOR DEBUG
+		uin = value[JSON_KEY_UIN]
+		status = value[JSON_KEY_STATUS]
+		friend = @qqbot.friend(uin)
+		case status
+		when STATUS_ONLINE
+			log("#{friend.nickname}(#{friend.qq_number}) 上线了")
+			# @send_message.call(uin, '正面上我！')
+		when STATUS_OFFLINE
+			log("#{friend.nickname}(#{friend.qq_number}) 下线了")
+			# @send_message.call(uin, '正面上我！')
+		when STATUS_AWAY
+			log("#{friend.nickname}(#{friend.qq_number}) 暂时离开")
+		when STATUS_SILENT
+			log("#{friend.nickname}(#{friend.qq_number}) 开始工作")
+		else
+			log("未处理的状态 #{status}")
+		end
+		true
+	end
 
 	COMMAND_LIST_MASTERS         = '权限狗列表'
 	COMMAND_LIST_PLUGINS         = '插件列表'
@@ -82,7 +175,7 @@ RESPONSE
 		when COMMAND_LIST_MASTERS
 			MASTERS
 		when COMMAND_LIST_PLUGINS
-			header = '已启用插件：'
+			header = "已启用插件：\n"
 			body = ''
 			@qqbot.plugins.each do |plugin|
 				unless @qqbot.plugin_forbidden? uin, plugin

@@ -202,12 +202,12 @@ class PluginNicknameResponserBase < PluginResponserBase
 	end
 
 	def deal_message(uin, sender_qq, sender_nickname, content, time)
-		super
+		# super # FOR DEBUG
 		response_or_ingnore(uin, sender_qq, sender_nickname, QQBot.message(content), time, @send_message)
 	end
 
 	def deal_group_message(guin, sender_qq, sender_nickname, content, time)
-		super
+		# super # FOR DEBUG
 		response_or_ingnore(guin, sender_qq, sender_nickname, $~[:message].strip, time, @send_group_message) if /^\s*@?#{bot_name}(?<message>.*)/ =~ QQBot.message(content)
 	end
 

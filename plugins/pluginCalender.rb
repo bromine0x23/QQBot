@@ -69,6 +69,7 @@ MANUAL
 
 	MONTH_DAY_ACC = [0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
 
+	# 迷之数组
 	CALENDAR_DATA = [
 		0x00A4B, 0x5164B, 0x006A5, 0x006D4, 0x415B5,
 		0x002B6, 0x00957, 0x2092F, 0x00497, 0x60C96,
@@ -122,10 +123,11 @@ MANUAL
 			"#{bot_name} 掷出了 #{random(get_seed(time) * time.sec * sender_qq, 5) % 6 + 1}" # 迷之伪随机5
 		else
 			if COMMAND_CHOOSE =~ message
-				if random(get_seed(Time.now) * sender_qq, 3) % 2 == 0 # 迷之伪随机3
-					"#{$~[:act]}！"
+				act = $~[:act]
+				if random(get_seed(Time.now) * act.sum * sender_qq, 3) % 2 == 0 # 迷之伪随机3
+					"#{act}！"
 				else
-					"不#{$~[:act]}……"
+					"不#{act}……"
 				end
 			end
 		end

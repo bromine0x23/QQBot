@@ -4,13 +4,15 @@
 require_relative 'plugin'
 
 class PluginCalender < PluginNicknameResponserBase
-	NAME = '运势插件'
+	NAME = '老黄历插件'
 	AUTHOR = 'BR'
-	VERSION = '1.3'
-	DESCRIPTION = '今日不宜：现充'
-	MANUAL = <<MANUAL
+	VERSION = '1.5'
+	DESCRIPTION = '今日不宜：玩弄AI'
+	MANUAL = <<MANUAL.strip
 我的运势
 今日黄历
+掷骰子
+<ACT>还是不<ACT>呢
 MANUAL
 	PRIORITY = 0
 
@@ -39,11 +41,8 @@ MANUAL
 		{name: '逛街', good: '物美价廉大优惠', bad: '会遇到奸商'},
 		{name: '写单元测试', good: '写单元测试将减少出错',bad: '写单元测试会降低你的开发效率'},
 		{name: '洗澡', good: '你几天没洗澡了？',bad: '会把设计方面的灵感洗掉'},
-		#{name: '锻炼一下身体', good: '',bad: '能量没消耗多少，吃得却更多'},
 		{name: '重构', good: '代码质量得到提高',bad: '你很有可能会陷入泥潭'},
 		{name: '在妹子面前吹牛', good: '改善你矮穷挫的形象',bad: '会被识破'},
-		#{name: '撸管', good: '避免缓冲区溢出',bad: '强撸灰飞烟灭'},
-		#{name: '浏览成人网站', good: '重拾对生活的信心',bad: '你会心神不宁'},
 		{name: '打DOTA', good: '你将有如神助',bad: '你会被虐的很惨'},
 		{name: '修复BUG', good: '你今天对BUG的嗅觉大大提高', bad: '新产生的BUG将比修复的更多'},
 		{name: '上微博', good: '今天发生的事不能错过',bad: '今天的微博充满负能量'},
@@ -93,45 +92,50 @@ MANUAL
 		0x00A5B, 0x60A57, 0x0052B, 0x00A93, 0x40E95
 	]
 
-	COMMAND_FORTUNE = '我的运势'
+	COMMAND_FORTUNE  = '我的运势'
 	COMMAND_CALENDER = '今日黄历'
-
-	def on_load
-		super
-		@things = THINGS
-	end
+	COMMAND_DICE     = '掷骰子'
+	COMMAND_CHOOSE   = /^(?<act>.+?)(还是)?不\k<act>/
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
-		super
-		if message == COMMAND_FORTUNE
-			date = Time.now
-			seed = get_seed(date)
-			<<RESPONSE
-#{get_date_string(date).strip}
-#{get_lunar_date_string(date).strip}
-#{sender_nickname} 的运势指数：#{get_level(seed, sender_qq)}
-RESPONSE
-		elsif message == COMMAND_CALENDER
-			date = Time.now
-			seed = get_seed(date)
+		# super # FOR DEBUG
+		case message
+		when COMMAND_FORTUNE
+			time = Time.now
+			response = get_date_string(time)
+			response << get_lunar_date_string(time)
+			level = random(get_seed(time) * sender_qq, 6) % 100 # 迷之伪随机6
+			response << "#{sender_nickname} 的运势指数：#{STR_FORTUNE_LEVELS[level / 5]}(#{level})"
+		when COMMAND_CALENDER
+			time = Time.now
+			seed = get_seed(time)
+			response = get_date_string(time)
+			response << get_lunar_date_string(time)
 			@things = THINGS.clone
-			good_things = get_good_things(seed)
-			bad_things = get_bad_things(seed)
-			<<RESPONSE
-#{get_date_string(date).strip}
-#{get_lunar_date_string(date).strip}
-宜：
-#{good_things.map{|thing| "#{thing[:name]}:#{thing[:good]}"}.join("\n")}
-忌：
-#{bad_things.map{|thing| "#{thing[:name]}:#{thing[:bad]}"}.join("\n")}
-RESPONSE
+			response << "宜：\n"
+			good_things(seed).each { |thing| response << "#{thing[:name]}:#{thing[:good]}\n" }
+			response << "忌：\n"
+			bad_things(seed).each { |thing| response << "#{thing[:name]}:#{thing[:bad]}\n" }
+			response
+		when COMMAND_DICE
+			time = Time.now
+			"#{bot_name} 掷出了 #{random(get_seed(time) * time.sec * sender_qq, 5) % 6 + 1}" # 迷之伪随机5
+		else
+			if COMMAND_CHOOSE =~ message
+				if random(get_seed(Time.now) * sender_qq, 3) % 2 == 0 # 迷之伪随机3
+					"#{$~[:act]}！"
+				else
+					"不#{$~[:act]}……"
+				end
+			end
 		end
 	end
 
+	# 迷之伪随机
 	def random(a, b)
-		(25+b).times.reduce(a % 11117) do |n|
-			n * n % 11117
-		end
+		n = a % 11117
+		(25+b).times { n = n * n % 11117 }
+		n
 	end
 
 	def get_seed(date)
@@ -140,13 +144,14 @@ RESPONSE
 
 	def get_date_string(date)
 		<<STRING
-#{date.year}年#{date.month}月#{date.day}日 星期#{STR_WEEK[date.wday]}
+#{date.year}年#{date.month}月#{date.day}日 周#{STR_WEEK[date.wday]}
 STRING
 	end
 
 	def get_lunar_date_string(date)
-		year, month, day = date.year, date.month, date.day
-		year += 1900 if year  < 1900
+		year  = date.year
+		month = date.month
+		day   = date.day
 		total_day = (year - 1921) * 365 + (year - 1921) / 4 + MONTH_DAY_ACC[month] + day - 38
 		total_day += 1 if year % 4 == 0 && month > 1
 
@@ -164,7 +169,9 @@ STRING
 			m += 1
 		end
 
-		year, month, day = 1921 + m, k - n + 1, total_day
+		year  = 1921 + m
+		month = k - n + 1
+		day   = total_day
 
 		if k == 12
 			door = CALENDAR_DATA[m] / 0x10000 + 1
@@ -180,25 +187,20 @@ STRING
 DATE
 	end
 
-	def get_level(seed, qq)
-		point = random(seed * qq, 6) % 100
-		"#{STR_FORTUNE_LEVELS[point / 5]}(#{point})"
-	end
-
-	def get_good_things(seed)
+	def good_things(seed)
 		good_things = []
-		sg = random(seed, 8) % 100
-		(random(seed, 9) % 3 + 1).times do
+		sg = random(seed, 8) % 100 # 迷之伪随机8
+		(random(seed, 9) % 3 + 1).times do # 迷之伪随机9
 			good_things << @things.delete_at((sg * 0.01 * @things.size).to_i)
 
 		end
 		good_things
 	end
 
-	def get_bad_things(seed)
+	def bad_things(seed)
 		bad_things = []
-		sb = random(seed, 4) % 100
-		(random(seed, 7) % 3 + 1).times do
+		sb = random(seed, 4) % 100 # 迷之伪随机4
+		(random(seed, 7) % 3 + 1).times do # 迷之伪随机7
 			bad_things << @things.delete_at((sb * 0.01 * @things.size).to_i)
 		end
 		bad_things

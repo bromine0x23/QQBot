@@ -8,9 +8,9 @@ require 'sqlite3'
 class PluginAI < PluginNicknameResponserBase
 	NAME = 'AI插件'
 	AUTHOR = 'BR'
-	VERSION = '1.7'
+	VERSION = '1.8'
 	DESCRIPTION = '人家才不是AI呢'
-	MANUAL = <<MANUAL
+	MANUAL = <<MANUAL.strip!
 == 复述 ==
 说 <复述内容>
 == 整句学习 ==
@@ -85,12 +85,6 @@ FROM messages
 WHERE message = ?
 SQL
 
-	SQL_REMOVE_MESSAGE = <<SQL
-DELETE
-FROM messages
-WHERE id = ?
-SQL
-
 	SQL_REMOVE_RESPONSES = <<SQL
 DELETE
 FROM responses
@@ -105,11 +99,12 @@ SQL
 	TABLE_RESPONSES = 'responses'
 
 	COMMAND_SAY             = /^说(?<response>.*)/m
-	COMMAND_LEARN           = /^学习(?<command>.*)/m
-	COMMAND_LEARN_ONELINE   = /^ (?<message>\S+) +(?<response>.+)/
-	COMMAND_LEARN_TOWLINE   = /^[\r\n](?<message>[^\r\n]+)[\r\n]+(?<response>.+)/
-	COMMAND_LEARN_MULTILINE = /^=(?<delimiter>\w+)\s*[\r\n](?<message>.+?)[\r\n]\k<delimiter>(?<response>.+)/m
 	COMMAND_FORGET          = /^忘记(?<message>.*)/m
+	COMMAND_LEARN           = /^学习(?<command>.*)/m
+	COMMAND_BLACKLIST       = /^(\d+)\s*是坏人$/
+	COMMAND_LEARN_ONELINE   = /^ (?<message>\S+) +(?<response>.+)/
+	COMMAND_LEARN_TOWLINE   = /^[\r\n](?<message>[^\r\n]+)[\r\n]+(?<response>.+)/m
+	COMMAND_LEARN_MULTILINE = /^=(?<delimiter>\w+)\s*[\r\n](?<message>.+?)[\r\n]\k<delimiter>(?<response>.+)/m
 
 	RESPONSE_TOOLONG      = %w(那太长了…… 这么长人家完全记不住嘛 好长……)
 	RESPONSE_LEARNED      = %w(诶……是这样嘛? 了解了 哦，原来如此 恩 了解)
@@ -119,7 +114,7 @@ SQL
 	RESPONSE_DOOR = 512
 
 	def on_load
-		super
+		# super # FOR DEBUG
 		log('连接数据库……')
 		@db = SQLite3::Database.open DB_FILE
 		@db.execute SQL_CREATE_TABLE_MESSAGES if @db.get_first_value(SQL_CHECK_TABLE, TABLE_MESSAGES).zero?
@@ -131,54 +126,55 @@ SQL
 	end
 
 	def on_unload
+		# super # FOR DEBUG
 		log('断开数据库连接')
 		@db.close
 	end
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
-		super
+		# super # FOR DEBUG
 		if COMMAND_SAY =~ message
 			$~[:response]
+		elsif COMMAND_FORGET =~ message
+			forget $~[:message].strip
+			RESPONSE_FORGETED.sample
 		elsif COMMAND_LEARN =~ message
 			command = $~[:command]
-			log("command:\n#{command.inspect}", Logger::DEBUG) if$-d
 			if COMMAND_LEARN_MULTILINE =~ command or COMMAND_LEARN_TOWLINE =~ command or COMMAND_LEARN_ONELINE =~ command
 				response = $~[:response].strip
 				if response.length < RESPONSE_DOOR
-					learn($~[:message].strip, response, sender_qq)
+					learn $~[:message].strip, response, sender_qq
 					RESPONSE_LEARNED.sample
 				else
 					RESPONSE_TOOLONG.sample
 				end
 			end
-		elsif COMMAND_FORGET =~ message
-			forget $~[:message].strip
-			RESPONSE_FORGETED.sample
 		else
 			response(message, sender_nickname)
 		end
 	end
 
 	def learn(message, response, created_by)
-		log("Teacher #{message} => #{response} by #{created_by}", Logger::DEBUG) if$-d
 		@db.transaction do |db|
 			time = Time.now.to_i
-			unless db.get_first_value(SQL_GET_MESSAGE_ID, message)
+			unless db.get_first_value SQL_GET_MESSAGE_ID, message
 				db.execute SQL_SET_MESSAGE, message, time
 			end
 			db.execute SQL_SET_RESPONSE, response, created_by, time, message
 		end
 	end
 
-	def forget(message, index = nil)
-		log("Forget #{message}", Logger::DEBUG) if$-d
+	def forget(message, _ = nil)
 		@db.transaction do |db|
 			db.execute SQL_REMOVE_RESPONSES, message
 		end
 	end
 
+	PLACEHOLDER_I = '{我}'
+	PLACEHOLDER_YOU = '{你}'
+
 	def response(message, sender_nickname)
-		result = @db.execute(SQL_GET_RESPONSES, message).map{ |row| row[0] }.sample
-		result.gsub(/\{我\}|\{你\}/, '{我}' => bot_name, '{你}' => sender_nickname) if result
+		result = @db.execute(SQL_GET_RESPONSES, message).map!{ |row| row[0] }.sample
+		result.gsub(/\{我\}|\{你\}/, PLACEHOLDER_I => bot_name, PLACEHOLDER_YOU => sender_nickname) if result
 	end
 end

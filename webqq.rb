@@ -98,164 +98,6 @@ class WebQQClient
 		end
 	end
 
-	# 封装登录步骤
-	module Loginer
-		# @param [Util::NetHelper] net_helper
-		# @param [Logger] logger
-		def self.login(qq, password, net_helper, logger, on_captcha_need)
-			random_key, client_id  = Random.rand, Random.rand(10000000...100000000) # 客户端id
-			nickname, uin, ptwebqq = nil, nil, nil
-			p_session_id, verify_webqq = nil, nil
-
-			begin
-				# 第一次握手
-				log(logger, '拉取验证信息……')
-				uri = URI::HTTPS.build(
-					host: HOST_SSL_PTLOGIN2_QQ,
-					path: '/check',
-					query: URI.encode_www_form(
-						uin: qq,
-						appid: APPID,
-						js_ver: JS_VER,
-						js_type: JS_TYPE,
-						login_sig: LOGIN_SIG,
-						u1: 'http://web2.qq.com/loginproxy.html',
-						r: random_key
-					)
-				)
-				need_verify, verify_code, key = net_helper.get(uri).scan(/'.*?'/).map{|str| str[1..-2]}
-				log(logger, "是否需要验证码： #{need_verify}", Logger::DEBUG) if $-d
-				log(logger, "密钥： #{key}", Logger::DEBUG) if $-d
-
-				if need_verify != '0'
-					# 需要验证码
-					log(logger, '获取验证码……')
-					uri = URI::HTTPS.build(
-						host: 'ssl.captcha.qq.com',
-						path: '/getimage',
-						query: URI.encode_www_form(
-							uin: qq,
-							aid: APPID,
-							r: random_key
-						)
-					)
-					verify_code = on_captcha_need.call(net_helper.get(uri))
-					log(logger, "验证码： #{verify_code}")
-				end
-
-				#加密密码
-				log(logger, '加密密码……')
-				password_encrypted = PasswordEncrypt.encrypt(password, verify_code, key)
-				log(logger, "密码加密为：#{password_encrypted}", Logger::DEBUG) if $-d
-
-				# 验证账号
-				log(logger, '验证账号……')
-				uri = URI::HTTPS.build(
-					host: HOST_SSL_PTLOGIN2_QQ,
-					path: '/login',
-					query: URI.encode_www_form(
-						u: qq,
-						p: password_encrypted,
-						verifycode: verify_code.downcase,
-						webqq_type: 10,
-						remember_uin: 1,
-						login2qq: 1,
-						aid: APPID,
-						u1:  'http://web2.qq.com/loginproxy.html?login2qq=1&webqq_type=10',
-						h: 1,
-						ptredirect: 0,
-						ptlang: 2052,
-						daid: 164,
-						from_ui: 1,
-						pttype: 1,
-						dumy: nil,
-						fp: 'loginerroralert',
-						action: '3-19-312901',
-						mibao_css: 'm_webqq',
-						t: 1,
-						g: 1,
-						js_ver: JS_VER,
-						js_type: JS_TYPE,
-						login_sig: LOGIN_SIG
-					)
-				)
-				state, _, address, info, _, nickname = net_helper.get(uri).scan(/'.*?'/).map{|str| str[1..-2]}
-				state = state.to_i
-				nickname = nickname.force_encoding('utf-8')
-				raise LoginFailed.new(state, info) unless state.zero?
-				log(logger, "账号验证成功，昵称：#{nickname}")
-
-				# 连接给定地址获得cookie
-				log(logger, '获取cookie……')
-				uri = URI(address)
-				net_helper.get(uri)
-				ptwebqq = net_helper.cookies[COOKIE_KEY_PTWEBQQ]
-
-				net_helper.add_header(HEADER_KEY_REFERER, HEADER_REFERER)
-
-				# 正式登录
-				log(logger, '正在登陆……')
-				json_data = get_session_data(net_helper, client_id, ptwebqq)
-				p_session_id, uin, verify_webqq = json_data[JSON_KEY_PSESSIONID], json_data[JSON_KEY_UIN], json_data[JSON_KEY_VFWEBQQ]
-				log(logger, '登陆成功')
-			rescue LoginFailed => ex
-				case ex.state
-				when 3
-					log(logger, "账号验证失败，账号密码不正确。(#{ex.info})")
-					return
-				when 4
-					log(logger, "账号验证失败，验证码不正确。(#{ex.info})")
-					retry
-				when 7
-					log(logger, "账号验证失败，参数不正确。(#{ex.info})")
-					return
-				else
-					log(logger, "账号验证失败，未知错误。(#{ex.info})")
-					return
-				end
-			end
-
-			{
-				client_id: client_id,
-				random_key: random_key,
-				nickname: nickname,
-				uin: uin,
-				ptwebqq: ptwebqq,
-				p_session_id: p_session_id,
-				verify_webqq: verify_webqq
-			}
-		end
-
-		private
-
-		def self.log(logger, message, level = Logger::INFO)
-			logger.log(level, message, self.name)
-		end
-
-
-		URI_GET_SESSION_DATA = URI('https://d.web2.qq.com/channel/login2')
-
-		def self.get_session_data(net_helper, client_id, ptwebqq)
-			json_data = JSON.parse(
-				net_helper.post(
-					URI_GET_SESSION_DATA,
-					URI.encode_www_form(
-						r: JSON.fast_generate(
-							status: 'online',
-							ptwebqq: ptwebqq,
-							passwd_sig: '',
-							clientid: client_id,
-							psessionid: nil
-						),
-						clientid: client_id
-					)
-				)
-			)
-			raise ErrorCode.new(json_data[JSON_KEY_RETCODE], json_data) unless json_data[JSON_KEY_RETCODE] == 0
-			json_data[JSON_KEY_RESULT]
-		end
-	end
-
 	# 封装消息接收线程
 	class MessageReceiver
 		TIMEOUT = 120
@@ -293,6 +135,7 @@ class WebQQClient
 								raise
 							else
 								log("poll时遭遇未知代码：#{ex.error_code}", Logger::FATAL)
+								raise
 							end
 						end
 					end
@@ -338,8 +181,28 @@ LOG
 						HEADER_KEY_REFERER => HEADER_REFERER,
 						HEADER_KEY_COOKIE => cookies
 					}
+					qun_request   = Net::HTTP::Post.new('/channel/send_qun_msg2', init_header)
+					qun_raw_data = {
+						group_uin: nil,
+						content: nil,
+						msg_id: nil,
+						clientid: client_id,
+						psessionid: p_session_id
+					}
+					data = {
+						r: nil,
+						clientid: client_id,
+						psessionid: p_session_id
+					}
 					buddy_request = Net::HTTP::Post.new('/channel/send_buddy_msg2', init_header)
-					qun_request = Net::HTTP::Post.new('/channel/send_qun_msg2', init_header)
+					buddy_raw_data = {
+						to: nil,
+						face: 0,
+						content: nil,
+						msg_id: nil,
+						clientid: client_id,
+						psessionid: p_session_id
+					}
 					message_counter = Random.rand(1000...10000) * 10000
 					loop do
 						data = @messages.pop
@@ -347,32 +210,19 @@ LOG
 							case data[:type]
 							when :group_message
 								message_counter += 1
-								qun_request.set_form_data(
-									r: JSON.fast_generate(
-										group_uin: data[:uin],
-										content: encode_content(data[:message], data[:font]),
-										msg_id: message_counter,
-										clientid: client_id,
-										psessionid: p_session_id
-									),
-									clientid: client_id,
-									psessionid: p_session_id
-								)
+								qun_raw_data[:group_uin] = data[:uin]
+								qun_raw_data[:content]   = encode_content(data[:message], data[:font])
+								qun_raw_data[:msg_id]    = message_counter
+								data[:r] = JSON.fast_generate(qun_raw_data)
+								qun_request.set_form_data(data)
 								post(https, qun_request)
 							when :message
 								message_counter += 1
-								buddy_request.set_form_data(
-									r: JSON.fast_generate(
-										to: data[:uin],
-										face: 0,
-										content: encode_content(data[:message], data[:font]),
-										msg_id: message_counter,
-										clientid: client_id,
-										psessionid: p_session_id
-									),
-									clientid: client_id,
-									psessionid: p_session_id
-								)
+								buddy_raw_data[:to]      = data[:uin]
+								buddy_raw_data[:content] = encode_content(data[:message], data[:font])
+								buddy_raw_data[:msg_id]  = message_counter
+								data[:r] = JSON.fast_generate(buddy_raw_data)
+								buddy_request.set_form_data(data)
 								post(https, buddy_request)
 							else
 								next
@@ -548,14 +398,135 @@ LOG
 	def login
 		return if @logined
 		log('开始登陆……')
-		info = Loginer.login(@qq, @password, @net_helper, @logger, @on_captcha_need)
-		@client_id = info[:client_id]
-		@random_key = info[:random_key]
-		@nickname = info[:nickname]
-		@uin = info[:uin]
-		@ptwebqq = info[:ptwebqq]
-		@p_session_id = info[:p_session_id]
-		@verify_webqq = info[:verify_webqq]
+
+		@random_key = Random.rand
+		@client_id  = Random.rand(10000000...100000000) # 客户端id
+
+		begin
+			# 第一次握手
+			log('拉取验证信息……')
+			uri = URI::HTTPS.build(
+				host: HOST_SSL_PTLOGIN2_QQ,
+				path: '/check',
+				query: URI.encode_www_form(
+					uin: @qq,
+					appid: APPID,
+					js_ver: JS_VER,
+					js_type: JS_TYPE,
+					login_sig: LOGIN_SIG,
+					u1: 'http://web2.qq.com/loginproxy.html',
+					r: @random_key
+				)
+			)
+			need_verify, verify_code, key = @net_helper.get(uri).scan(/'.*?'/).map{|str| str[1..-2]}
+			log("是否需要验证码： #{need_verify}", Logger::DEBUG) if $-d
+			log("密钥： #{key}", Logger::DEBUG) if $-d
+
+			if need_verify != '0'
+				# 需要验证码
+				log('获取验证码……')
+				uri = URI::HTTPS.build(
+					host: 'ssl.captcha.qq.com',
+					path: '/getimage',
+					query: URI.encode_www_form(
+						uin: @qq,
+						aid: APPID,
+						r: @random_key
+					)
+				)
+				verify_code = @on_captcha_need.call(@net_helper.get(uri))
+				log("验证码： #{verify_code}")
+			end
+
+			#加密密码
+			log('加密密码……')
+			password_encrypted = PasswordEncrypt.encrypt(@password, verify_code, key)
+			log("密码加密为：#{password_encrypted}", Logger::DEBUG) if $-d
+
+			# 验证账号
+			log('验证账号……')
+			uri = URI::HTTPS.build(
+				host: HOST_SSL_PTLOGIN2_QQ,
+				path: '/login',
+				query: URI.encode_www_form(
+					u: qq,
+					p: password_encrypted,
+					verifycode: verify_code.downcase,
+					webqq_type: 10,
+					remember_uin: 1,
+					login2qq: 1,
+					aid: APPID,
+					u1:  'http://web2.qq.com/loginproxy.html?login2qq=1&webqq_type=10',
+					h: 1,
+					ptredirect: 0,
+					ptlang: 2052,
+					daid: 164,
+					from_ui: 1,
+					pttype: 1,
+					dumy: nil,
+					fp: 'loginerroralert',
+					action: '3-19-312901',
+					mibao_css: 'm_webqq',
+					t: 1,
+					g: 1,
+					js_ver: JS_VER,
+					js_type: JS_TYPE,
+					login_sig: LOGIN_SIG
+				)
+			)
+			state, _, address, info, _, nickname = @net_helper.get(uri).scan(/'.*?'/).map{|str| str[1..-2]}
+			state = state.to_i
+			@nickname = nickname.force_encoding('utf-8')
+			raise LoginFailed.new(state, info) unless state.zero?
+			log("账号验证成功，昵称：#{@nickname}")
+
+			# 连接给定地址获得cookie
+			log('获取cookie……')
+			@net_helper.get(URI(address))
+			@ptwebqq = @net_helper.cookies[COOKIE_KEY_PTWEBQQ]
+
+			@net_helper.add_header(HEADER_KEY_REFERER, HEADER_REFERER)
+
+			# 获取会话数据
+			log('正在登陆……')
+			json_data = JSON.parse(
+				@net_helper.post(
+					URI('https://d.web2.qq.com/channel/login2'),
+					URI.encode_www_form(
+						r: JSON.fast_generate(
+							status: 'online',
+							ptwebqq: @ptwebqq,
+							passwd_sig: '',
+							clientid: @client_id,
+							psessionid: nil
+						),
+						clientid: @client_id
+					)
+				)
+			)
+			raise ErrorCode.new(json_data[JSON_KEY_RETCODE], json_data) unless json_data[JSON_KEY_RETCODE] == 0
+			session_data  = json_data[JSON_KEY_RESULT]
+			@p_session_id = session_data[JSON_KEY_PSESSIONID]
+			@uin          = session_data[JSON_KEY_UIN]
+			@verify_webqq = session_data[JSON_KEY_VFWEBQQ]
+			log('登陆成功')
+		rescue LoginFailed => ex
+			case ex.state
+			when 3
+				log("账号验证失败，账号密码不正确。(#{ex.info})")
+				return
+			when 4
+				log("账号验证失败，验证码不正确。(#{ex.info})")
+				retry
+			when 7
+				log("账号验证失败，参数不正确。(#{ex.info})")
+				return
+			else
+				log("账号验证失败，未知错误。(#{ex.info})")
+				return
+			end
+		end
+
 		@logined = true
 		self
 	end

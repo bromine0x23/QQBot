@@ -16,9 +16,9 @@ require 'rexml/document'
 class PluginEVE < PluginNicknameResponserBase
 	NAME = 'EVE插件'
 	AUTHOR = 'BR'
-	VERSION = '1.3'
+	VERSION = '1.4'
 	DESCRIPTION = '我们的征途的星辰大海'
-	MANUAL = <<MANUAL
+	MANUAL = <<MANUAL.strip
 == 吉他价格查询 ==
 EVE 市场 <物品>（用逗号(,，)分割）
 EVE 基础矿物
@@ -28,16 +28,14 @@ MANUAL
 	CONFIG_FILE = File.expand_path(File.dirname(__FILE__) + '/pluginEVE.yaml')
 	
 	COMMAND_PATTERN = /^EVE\s*(?<command>.+)/i
-	MARKET_PATTERN  = /^市场\s*(?<item_names>.+)/i
+	MARKET_PATTERN  = /^市场\s*(?<item_names>.+)/
 	MINERAL_PATTERN = /^基础矿物$/i
 
 	URI_MARKET  = 'http://www.ceve-market.org/api/market/region/10000002/system/30000142/type/%d.json'
 	URI_MINERAL = 'http://www.ceve-market.org/api/evemon'
 
-	KEY_BUY  = 'buy'
-	KEY_SELL = 'sell'
-	KEY_MAX  = 'max'
-	KEY_MIN  = 'min'
+	JSON_KEY_BUY, JSON_KEY_SELL  = 'buy', 'sell'
+	JSON_KEY_MAX, JSON_KEY_MIN  = 'max', 'min'
 
 	NO_PRICE = '暂无出价'
 
@@ -48,43 +46,43 @@ MANUAL
 	THOUSAND_SEPARATOR = ','
 
 	def on_load
-		super
+		# super # FOR DEBUG
 		log('加载物品名数据……')
-		@items = YAML.load_file(CONFIG_FILE)
+		@items = YAML.load_file CONFIG_FILE
 		log('加载完毕')
 	end
 
-	def fix_price(price)
+	def format_price(price)
 		price.gsub(PATTERN_THOUSAND_SEPARATOR, THOUSAND_SEPARATOR)
 	end
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
-		super
+		# super # FOR DEBUG
+
 		if COMMAND_PATTERN =~ message
 			command = $~[:command]
 			if MINERAL_PATTERN =~ command
-				response = response_header_with_nickname(sender_nickname)
+				response = self.response_header_with_nickname(sender_nickname)
 				REXML::Document.new(Net::HTTP.get(URI(URI_MINERAL))).each_element(XPATH_MINERAL) do |element|
 					response << <<RESPONSE
-#{element[0].text}：#{fix_price(element[1].text)} ISK
+#{element[0].text}：#{format_price(element[1].text)} ISK
 RESPONSE
 				end
 				response
 			elsif MARKET_PATTERN =~ command 
-				response = <<RESPONSE
-回 #{sender_nickname} 大人：
-RESPONSE
+				response = response_header_with_nickname sender_nickname
 				$~[:item_names].split(PATTERN_ITEM_NAMES_SEPARATOR).each do |item_name|
-					response << if @items.has_key? item_name
-						data = JSON.parse(Net::HTTP.get(URI(URI_MARKET % @items[item_name])))
-						buy, sell = data[KEY_BUY][KEY_MAX], data[KEY_SELL][KEY_MIN]
-						<<RESPONSE
+					if @items.has_key? item_name
+						json_data = JSON.parse(Net::HTTP.get(URI(URI_MARKET % @items[item_name])))
+						buy  = json_data[JSON_KEY_BUY][JSON_KEY_MAX]
+						sell = json_data[JSON_KEY_SELL][JSON_KEY_MIN]
+						response << <<RESPONSE
 #{item_name} 吉他报价
-求购：#{buy  ? fix_price( buy.round(2).to_s) : NO_PRICE} ISK
-出售：#{sell ? fix_price(sell.round(2).to_s) : NO_PRICE} ISK
+求购：#{buy  ? format_price( buy.round(2).to_s) : NO_PRICE} ISK
+出售：#{sell ? format_price(sell.round(2).to_s) : NO_PRICE} ISK
 RESPONSE
 					else
-						<<RESPONSE
+						response << <<RESPONSE
 不存在物品：#{item_name}
 RESPONSE
 					end

@@ -41,9 +41,10 @@ class QQBot
 					datas = @message_receiver.data
 					datas.each do |data|
 						log("data: #{data}", Logger::DEBUG) if $-d
-						poll_type, value = data[KEY_POLL_TYPE], data[KEY_VALUE]
-						from_uin = value[KEY_FROM_UIN]
-						event = :"on_#{poll_type}"
+						poll_type = data[KEY_POLL_TYPE]
+						value     = data[KEY_VALUE]
+						event     = :"on_#{poll_type}"
+						from_uin  = value[KEY_FROM_UIN]
 
 						@plugins.each do |plugin|
 							next if plugin_forbidden?(from_uin, plugin)
@@ -126,9 +127,6 @@ class QQBot
 		@masters.include? qq_number
 	end
 
-	#def group_master?(group_number, qq_number)
-	#end
-
 	def friend(uin)
 		@friends[uin]
 	end
@@ -156,9 +154,16 @@ class QQBot
 		true
 	end
 
+	# @return [WebQQClient::QQFriend]
 	def add_friend(uin)
 		new_friend = @client.add_friend(uin)
 		@friends[new_friend.uin] = new_friend
+	end
+
+
+	# @return [WebQQClient::QQFriend]
+	def delete_friend(uin)
+		@friends.delete(uin)
 	end
 
 	private
@@ -193,7 +198,7 @@ class QQBot
 				log("调用栈：\n#{ex.backtrace.join("\n")}", Logger::ERROR)
 			end
 		}
-		@plugins.sort! { |plugin1, plugin2| plugin2.priority <=> plugin1.priority }
+		@plugins.sort_by { |plugin| -plugin.priority }
 		load_plugin_config
 		log('插件载入完毕')
 	end

@@ -93,9 +93,9 @@ MANUAL
 	end
 
 	def on_input_notify(value)
-		log("input_notify #{value}")
+		log("input_notify #{value}", Logger::DEBUG) if $-d
 		# 桩方法，处理 input_notify 消息
-		nil
+		true # 暂时忽略
 	end
 
 	def on_buddies_status_change(value)
@@ -162,7 +162,7 @@ class PluginResponserBase < PluginBase
 	KEY_SEND_UIN = 'send_uin'
 	KEY_CONTENT = 'content'
 	KEY_TIME = 'time'
-
+	
 	def response_header_with_nickname(nickname)
 		response = <<RESPONSE
 回 #{nickname} 大人：
@@ -197,11 +197,6 @@ end
 class PluginNicknameResponserBase < PluginResponserBase
 	NAME = '昵称呼叫型消息回应插件基类'
 
-	def on_load
-		super
-		@nickname = @qqbot.bot_name
-	end
-
 	def bot_name
 		@qqbot.bot_name
 	end
@@ -224,5 +219,6 @@ class PluginNicknameResponserBase < PluginResponserBase
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		log("处理指令：#{message}", Logger::DEBUG) if $-d
 		# 桩方法，处理消息响应
+		nil
 	end
 end

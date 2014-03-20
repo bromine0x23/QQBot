@@ -3,7 +3,6 @@
 
 require_relative 'plugin'
 
-require 'logger'
 require 'sqlite3'
 
 class PluginChatLogger < PluginResponserBase
@@ -11,7 +10,7 @@ class PluginChatLogger < PluginResponserBase
 	AUTHOR = 'BR'
 	VERSION = '1.3'
 	DESCRIPTION = '记记记记记'
-	MANUAL = <<MANUAL
+	MANUAL = <<MANUAL.strip
 记记记记记
 MANUAL
 	PRIORITY = 16
@@ -53,19 +52,21 @@ SQL
 	TYPEID_GROUP_MESSAGE = 1
 
 	def on_load
-		super
+		# super # FOR DEBUG
 		log('连接数据库……')
 		@db = SQLite3::Database.open DB_FILE
 		@db.execute SQL_CREATE_TABLE_MESSAGES if @db.get_first_value(SQL_CHECK_TABLE, TABLE_MESSAGES).zero?
+		log('数据库连接完毕')
 	end
 
 	def on_unload
-		super
+		# super # FOR DEBUG
 		log('断开数据库连接')
 		@db.close
 	end
 
 	def deal_message(uin, sender_qq, sender_nickname, content, time)
+		# super # FOR DEBUG
 		@db.transaction do |db|
 			db.execute SQL_INSERT_MESSAGE, TYPEID_MESSAGE, sender_qq, sender_nickname, sender_qq, sender_nickname, QQBot.message(content), time
 		end
@@ -73,7 +74,8 @@ SQL
 	end
 
 	def deal_group_message(guin, sender_qq, sender_nickname, content, time)
-		group = @qqbot.group(guin)
+		# super # FOR DEBUG
+		group = @qqbot.group guin
 		@db.transaction do |db|
 			db.execute SQL_INSERT_MESSAGE, TYPEID_GROUP_MESSAGE, group.group_number, group.group_name, sender_qq, sender_nickname, QQBot.message(content), time
 		end

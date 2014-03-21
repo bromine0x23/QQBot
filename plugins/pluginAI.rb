@@ -1,8 +1,6 @@
 #!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
-require_relative 'plugin'
-
 require 'sqlite3'
 
 class PluginAI < PluginNicknameResponserBase
@@ -126,8 +124,8 @@ SQL
 
 	def on_unload
 		# super # FOR DEBUG
-		log('断开数据库连接', Logger::DEBUG) if $-d
 		@db.close
+		log('数据库连接断开', Logger::DEBUG) if $-d
 	end
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)

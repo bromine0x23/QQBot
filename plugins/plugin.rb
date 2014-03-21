@@ -11,14 +11,14 @@ MANUAL
 	PRIORITY = 0
 
 	@@plugins = []
-	@@sub_plugins = []
+	@@instance_plugins = []
+
+	def self.instance_plugins
+		@@instance_plugins
+	end
 
 	def self.plugins
 		@@plugins
-	end
-
-	def self.sub_plugins
-		@@sub_plugins
 	end
 
 	# @param [QQBot] qqbot
@@ -28,7 +28,6 @@ MANUAL
 		@logger = logger
 		@send_message = @qqbot.method(:send_message)
 		@send_group_message = @qqbot.method(:send_group_message)
-
 		on_load
 		log('初始化完毕', Logger::DEBUG) if $-d
 	end
@@ -159,8 +158,8 @@ MANUAL
 	STR_BASE = 'Base'
 
 	def self.inherited(subclass)
-		@@sub_plugins.unshift subclass
-		@@plugins << subclass unless subclass.name.end_with? STR_BASE
+		@@plugins.unshift subclass
+		@@instance_plugins << subclass unless subclass.name.end_with? STR_BASE
 	end
 end
 

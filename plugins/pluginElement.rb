@@ -1,11 +1,9 @@
 #!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
-# require_relative 'plugin'
-
 require 'yaml'
 
-class PluginAI # < PluginNicknameResponserBase
+class PluginElement < PluginNicknameResponserBase
 	NAME = '化学元素插件'
 	AUTHOR = 'BR'
 	VERSION = '1.0'
@@ -17,7 +15,7 @@ MANUAL
 
 	COMMAND_PATTERN = /^化学元素\s*(?<element>.+)/
 
-	FILE_DATA = 'pluginElement.yaml'
+	FILE_DATA = file_path __FILE__, 'pluginElement.yaml'
 
 	def on_load
 		data = YAML.load_file(FILE_DATA)
@@ -33,8 +31,8 @@ MANUAL
 		string << "相对原子质量：#{element[:相对原子质量]}"
 		string << "室温状态：#{element[:室温状态]}\n"
 		string << "熔点：#{element[:摄氏熔点]}℃（#{element[:开氏熔点]}Ｋ）\n"
-		string << (element[:是否升华] ? "沸点：#{element[:摄氏沸点]}℃（#{element[:开氏沸点]}Ｋ）\n" : "沸点：升华\n")
-		string << "氧化价：#{element[:氧化价]}\n"
+		string << (element[:是否升华] ? "沸点：升华\n" : "沸点：#{element[:摄氏沸点]}℃（#{element[:开氏沸点]}Ｋ）\n")
+		string << "氧化价：#{element[:氧化价].join(',')}\n"
 		string
 	end
 

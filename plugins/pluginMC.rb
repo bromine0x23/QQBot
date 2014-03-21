@@ -1,8 +1,6 @@
 #!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
-require_relative 'plugin'
-
 class PluginMC < PluginNicknameResponserBase
 	NAME = 'MC插件'
 	AUTHOR = 'BR'
@@ -14,34 +12,33 @@ MC 合成 <物品>（用逗号(,，)分割）
 MANUAL
 	PRIORITY = 0
 
-	CONFIG_FILE = file_path __FILE__, 'pluginMC.yaml'
+	CONST_数据文件 = file_path __FILE__, 'pluginMC.yaml'
 
 	# COMMAND_PATTERN = /^MC\s*(?<command>.+)/i
 	# RECIPE_PATTERN = /^合成\s*(?<item_names>.+)/i
 
-	COMMAND_PATTERN = /^MC\s*合成\s*(?<item_names>.+)/i
+	CONST_命令格式 = /^MC\s*合成\s*(?<item_names>.+)/i
 
-	PATTERN_ITEM_NAMES_SEPARATOR = /,|，/
+	CONST_物品名分隔符 = /,|，/
 
 	def on_load
 		# super # FOR DEBUG
-		yaml_data = YAML.load_file CONFIG_FILE
-		@alias, @recipes = yaml_data['alias'], yaml_data['recipe']
+		yaml数据 = YAML.load_file CONST_数据文件
+		@别名表 = yaml数据['alias']
+		@合成表 = yaml数据['recipe']
+		@别名表.default_proc = proc { |hash, key| hash[key] = key }
+		@合成表.default_proc = proc { |hash, key| hash[key] = "不存在物品：#{key} 的合成公式" }
 		log('合成表数据加载完毕', Logger::DEBUG) if $-d
 	end
 
-	def get_response(uin, sender_qq, sender_nickname, message, time)
+	def get_response(uin, 发送者Q号, 发送者昵称, 消息, 时间)
 		# super # FOR DEBUG
-
-		if COMMAND_PATTERN =~ message
-			response = response_header_with_nickname sender_nickname
-			$~[:item_names].split(PATTERN_ITEM_NAMES_SEPARATOR).each do |item_name|
-				item_name = @alias[item_name] if @alias.has_key? item_name
-				response << <<RESPONSE
-#{(@recipes.has_key? item_name) ? @recipes[item_name] : "不存在物品：#{item_name} 的合成公式"}
-RESPONSE
+		if CONST_命令格式 =~ 消息
+			回应 = response_header_with_nickname 发送者昵称
+			$~[:item_names].split(CONST_物品名分隔符).each do |item_name|
+				回应 << @合成表[@别名表[item_name]] << "\n"
 			end
-			response
+			回应
 		end
 	end
 end

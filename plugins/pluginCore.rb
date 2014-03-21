@@ -1,8 +1,6 @@
 #!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
-require_relative 'plugin'
-
 require 'sqlite3'
 require 'yaml'
 

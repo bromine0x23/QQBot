@@ -4,7 +4,6 @@
 require_relative 'webqq'
 require 'yaml'
 require 'set'
-# require_relative 'plugins/plugin'
 
 # $DEBUG = true
 
@@ -14,7 +13,7 @@ class QQBot
 	LOAD_PLUGINS_PATH = './plugins/plugin*.rb'
 
 	class PluginAdministrator
-		PATH_PLUGINS = './plugins/plugin?*.rb'
+		PATH_PLUGINS = './plugins/plugin*.rb'
 		FILE_RULES = 'plugin_rules.yaml'
 
 		attr_reader :plugins
@@ -28,7 +27,7 @@ class QQBot
 		def load_plugins
 			Dir.glob(PATH_PLUGINS) { |file_name| load file_name }
 			@plugins = []
-			PluginBase.plugins.each { |plugin_class|
+			PluginBase.instance_plugins.each { |plugin_class|
 				begin
 					@plugins << plugin_class.new(@qqbot, @logger)
 				rescue Exception => ex
@@ -47,10 +46,11 @@ LOG
 
 		def unload_plugins
 			save_rules
-			@plugins.each { |plugin| plugin.on_unload }
-			Object.constants.each do |symbol|
-				Object.send(:remove_const, symbol) if symbol != :PluginAdministrator and  /^Plugin*/ =~ symbol
+			@plugins.pop.on_unload until @plugins.empty?
+			PluginBase.plugins.each do |plugin|
+				Object.send(:remove_const, plugin.name.to_sym)
 			end
+			Object.send(:remove_const, :PluginBase)
 			log('插件卸载完毕', Logger::DEBUG) if $-d
 			true
 		end
@@ -183,9 +183,11 @@ LOG
 		load_plugins
 		refresh_entities
 		begin
+			log('登录成功！')
 			puts 'QQBot已成功登录！'
 			loop do
 				datas = @message_receiver.data
+				log("data => #{datas}") if $-d
 				datas.each do |data|
 					@plugin_adminsrator.on_event(data)
 				end

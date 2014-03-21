@@ -1,8 +1,6 @@
 #!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
-require_relative 'plugin'
-
 class PluginCalender < PluginNicknameResponserBase
 	NAME = '老黄历插件'
 	AUTHOR = 'BR'

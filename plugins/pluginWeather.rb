@@ -1,8 +1,6 @@
 #!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
-require_relative 'plugin'
-
 =begin
 使用了LBS开放平台API
 参见：http://developer.baidu.com/map/carapi-7.htm

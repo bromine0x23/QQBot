@@ -2,17 +2,17 @@
 :common:
   :log_file: qqbot.log
   :captcha_file: captcha.jpg
-  :qq: '10086'
-  :password: 123456
-  :bot_name: QQBot
-  :masters: !ruby/object:Set
+  :qq: '10086' # Q号
+  :password: 123456 # 密码
+  :bot_name: QQBot # 机器人昵称
+  :masters: !ruby/object:Set # 最高权限管理员
     hash:
       10000: true
 :font:
-  name: 微软雅黑
-  size: 12
-  color: '000000'
-  bold: 0
-  italic: 0
-  underline: 0
+  :name: 微软雅黑
+  :size: 12
+  :color: '000000'
+  :bold: false
+  :italic: false
+  :underline: false
 

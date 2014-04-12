@@ -350,29 +350,3 @@ ENTITY
 		gets.strip.upcase
 	end
 end
-
-# qqbot.test
-qqbot = QQBot.new
-#=begin
-loop do
-	restart = 0
-	begin
-		qqbot.run
-	rescue Exception => ex
-		puts ex
-		puts ex.backtrace
-		puts 'WebQQ已掉线，将在10秒后重启……'
-
-		sleep(10)
-
-		restart += 1
-		if restart > 10
-			puts '重启超过10次，退出'
-			break
-		end
-
-		retry
-	end
-end
-#=end
-# qqbot.logout_clean

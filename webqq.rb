@@ -141,6 +141,8 @@ class WebQQClient
 							end
 						end
 					end
+				rescue WebQQClient::ErrorCode
+					raise
 				rescue Exception => ex
 					log(<<LOG.strip, Logger::ERROR)
 捕获到异常：#{ex.message}

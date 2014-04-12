@@ -26,7 +26,7 @@ class QQBot
 		end
 
 		def load_plugins
-			load file_name SOURC_PLUGIN
+			load SOURC_PLUGIN
 			Dir.glob(PATH_PLUGINS).sort.each { |file_name| load file_name }
 			@plugins = []
 			PluginBase.instance_plugins.each { |plugin_class|
@@ -195,7 +195,6 @@ LOG
 				end
 			end
 		ensure
-			save_entities
 			stop
 		end
 	end

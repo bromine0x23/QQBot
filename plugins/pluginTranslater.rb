@@ -6,53 +6,105 @@ require 'net/http'
 require 'uri'
 
 =begin
-使用了有道翻译API
-参见 http://fanyi.youdao.com/openapi
+使用了百度翻译API
+参见 http://developer.baidu.com/wiki/index.php?title=%E5%B8%AE%E5%8A%A9%E6%96%87%E6%A1%A3%E9%A6%96%E9%A1%B5/%E7%99%BE%E5%BA%A6%E7%BF%BB%E8%AF%91API
 =end
 class PluginTranslater < PluginNicknameResponserBase
 	NAME = '翻译插件'
 	AUTHOR = 'BR'
-	VERSION = '1.6'
-	DESCRIPTION = '妈妈再也不用担心我的英语了！'
+	VERSION = '1.7'
+	DESCRIPTION = '妈妈再也不用担心我的外语了！'
 	MANUAL = <<MANUAL.strip
-翻译 <翻译内容>
+<源语言>译<目标语言> <翻译内容>
+支持语言：
+中、汉：中文
+英：英语
+日：日文
+韩：韩语
+法：法语
+泰：泰语
+俄：俄罗斯语
+西：西班牙语
+葡：葡萄牙语
+阿：阿拉伯语
+粤：粤语
+文：文言文
 MANUAL
 	PRIORITY = 0
 
-	URI_FORMAT = [
-		'http://fanyi.youdao.com/openapi.do?keyfrom=bakachu&key=340119877&type=data&doctype=json&version=1.1&q=%s',
-		'http://fanyi.youdao.com/openapi.do?keyfrom=Idol-CHU&key=211173787&type=data&doctype=json&version=1.1&q=%s',
-		'http://fanyi.youdao.com/openapi.do?keyfrom=ShiningCo&key=1178023468&type=data&doctype=json&version=1.1&q=%s'
-	]
+	STRING_翻译 = '翻译'
+	STRING_AUTO = 'auto'
+	STRING_52001 = '52001'
+	STRING_52002 = '52002'
+	STRING_52003 = '52003'
 
-	COMMAND_PATTERN = /^翻译\s*(?<text>.+)/
 
-	KEY_ERRORCODE = 'errorCode'
-	KEY_TRANSLATE = 'translation'
+	HASH_缩写_TO_标识符 = {
+		'中' => 'zh',
+		'汉' => 'zh',
+		'英' => 'en',
+		'日' => 'jp',
+		'韩' => 'kor',
+		'法' => 'fra',
+		'泰' => 'th',
+		'俄' => 'ru',
+		'西' => 'spa',
+		'葡' => 'pt',
+		'阿' => 'ara',
+		'粤' => 'yue',
+		'文' => 'wyw',
+	}
 
-	RESPONSE_TOOLONG     = '那太长了'
-	RESPONSE_FAILED      = '无法进行有效的翻译'
-	RESPONSE_UNSUPPORT   = '不支持的语言类型'
-	RESPONSE_INVALID_KEY = '无效的key'
-	RESPONSE_UNKNOWN     = '未知错误'
+	HASH_标识符_TO_缩写 = {
+		'zh' => '汉',
+		'en' => '英',
+		'jp' => '日',
+		'kor' => '韩',
+		'fra' => '法',
+		'th' => '泰',
+		'ru' => '俄',
+		'spa' => '西',
+		'pt' => '葡',
+		'ara' => '阿',
+		'yue' => '粤',
+		'wyw' => '文言',
+	}
+
+	COMMAND_PATTERN = /^(?<翻译方向>#{STRING_翻译}|(?<源语言>.)译(?<目标语言>.))\s*(?<待翻译内容>.+)/
+
+	JSON_KEY_ERROR_CODE = 'error_code'
+	JSON_KEY_ERROR_MSG = 'error_msg'
+	JSON_KEY_FROM = 'from'
+	JSON_KEY_TO = 'to'
+	JSON_KEY_TRANS_RESULT = 'trans_result'
+	JSON_KEY_DST = 'dst'
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		# super # FOR DEBUG
 		if COMMAND_PATTERN =~ message
-			json_data = JSON.parse(Net::HTTP.get(URI(URI_FORMAT.sample % URI.encode_www_form_component($~[:text]))))
-			case json_data[KEY_ERRORCODE]
-			when 0
-				json_data[KEY_TRANSLATE].join("\n")
-			when 20
-				RESPONSE_TOOLONG
-			when 30
-				RESPONSE_FAILED
-			when 40
-				RESPONSE_UNSUPPORT
-			when 50
-				RESPONSE_INVALID_KEY
+			if $~[:翻译方向] == STRING_翻译
+				目标语言 = 源语言 = STRING_AUTO
 			else
-				RESPONSE_UNKNOWN
+				源语言 = HASH_缩写_TO_标识符[$~[:源语言]]
+				目标语言 = HASH_缩写_TO_标识符[$~[:目标语言]]
+			end
+
+			待翻译内容 = $~[:待翻译内容]
+
+			json_data = JSON.parse(Net::HTTP.get(URI("http://openapi.baidu.com/public/2.0/bmt/translate?client_id=TnChRGR56PhGC0mjA1rG0ueG&q=#{待翻译内容}&from=#{源语言}&to=#{目标语言}")))
+
+			case json_data[JSON_KEY_ERROR_CODE]
+			when STRING_52001
+				'翻译错误：超时'
+			when STRING_52002
+				'翻译错误：翻译系统错误'
+			when STRING_52003
+				'翻译错误：未授权的用户'
+			else
+				<<responce
+#{HASH_标识符_TO_缩写[json_data[JSON_KEY_FROM]]}译#{HASH_标识符_TO_缩写[json_data[JSON_KEY_TO]]}：
+#{json_data[JSON_KEY_TRANS_RESULT].map {|result| result[JSON_KEY_DST]}.join("\n")}
+responce
 			end
 		end
 	end

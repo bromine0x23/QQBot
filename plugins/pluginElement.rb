@@ -25,7 +25,7 @@ MANUAL
 
 	def join_element_data(element)
 		string = "No.#{element[:原子序数]} #{element[:符号]}（"
-		string << (element[:中文名] << '，' if element[:中文名])
+		string << element[:中文名] << '，' if element[:中文名]
 		string << element[:英文名] << "）\n"
 		string << "第#{element[:周期]}周期 #{element[:区]}区 #{element[:族]}族\n"
 		string << "相对原子质量：#{element[:相对原子质量]}"

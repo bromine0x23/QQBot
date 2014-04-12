@@ -13,7 +13,8 @@ class QQBot
 	LOAD_PLUGINS_PATH = './plugins/plugin*.rb'
 
 	class PluginAdministrator
-		PATH_PLUGINS = './plugins/plugin*.rb'
+		SOURC_PLUGIN = './plugins/plugin.rb'
+		PATH_PLUGINS = './plugins/plugin?*.rb'
 		FILE_RULES = 'plugin_rules.yaml'
 
 		attr_reader :plugins
@@ -25,7 +26,8 @@ class QQBot
 		end
 
 		def load_plugins
-			Dir.glob(PATH_PLUGINS) { |file_name| load file_name }
+			load file_name SOURC_PLUGIN
+			Dir.glob(PATH_PLUGINS).sort.each { |file_name| load file_name }
 			@plugins = []
 			PluginBase.instance_plugins.each { |plugin_class|
 				begin

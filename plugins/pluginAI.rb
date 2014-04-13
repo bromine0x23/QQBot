@@ -6,7 +6,7 @@ require 'sqlite3'
 class PluginAI < PluginNicknameResponserBase
 	NAME = 'AI插件'
 	AUTHOR = 'BR'
-	VERSION = '1.9'
+	VERSION = '1.10'
 	DESCRIPTION = '人家才不是AI呢'
 	MANUAL = <<MANUAL.strip!
 == 复述 ==
@@ -107,7 +107,7 @@ SQL
 	RESPONSE_TOOLONG      = %w(那太长了…… 这么长人家完全记不住嘛 好长……)
 	RESPONSE_LEARNED      = %w(诶……是这样嘛? 了解了 哦，原来如此 恩 了解)
 	RESPONSE_FORGETED     = %w(Accept 记忆已清除)
-	RESPONSE_NULL         = %w(喵 喵呜 汪)
+	RESPONSE_NULL         = %w(喵 喵呜 汪 ≧ω≦喵！)
 	RESPONSE_UNKOWN_ERROR = %w(未知错误 好像哪里不对)
 	RESPONSE_DOOR = 512
 
@@ -172,6 +172,10 @@ SQL
 
 	def response(message, sender_nickname)
 		result = @db.execute(SQL_GET_RESPONSES, message).map!{ |row| row[0] }.sample
-		result.gsub(/\{我\}|\{你\}/, PLACEHOLDER_I => bot_name, PLACEHOLDER_YOU => sender_nickname) if result
+		if result
+			result.gsub(/\{我\}|\{你\}/, PLACEHOLDER_I => bot_name, PLACEHOLDER_YOU => sender_nickname)
+		else
+			RESPONSE_NULL.sample
+		end
 	end
 end

@@ -91,7 +91,7 @@ MANUAL
 
 			待翻译内容 = $~[:待翻译内容]
 
-			json_data = JSON.parse(Net::HTTP.get(URI("http://openapi.baidu.com/public/2.0/bmt/translate?client_id=TnChRGR56PhGC0mjA1rG0ueG&q=#{待翻译内容}&from=#{源语言}&to=#{目标语言}")))
+			json_data = JSON.parse(Net::HTTP.get(URI("http://openapi.baidu.com/public/2.0/bmt/translate?client_id=TnChRGR56PhGC0mjA1rG0ueG&q=#{URI.encode_www_form_component(待翻译内容)}&from=#{源语言}&to=#{目标语言}")))
 
 			case json_data[JSON_KEY_ERROR_CODE]
 			when STRING_52001

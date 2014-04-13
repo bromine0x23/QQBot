@@ -4,7 +4,7 @@
 class PluginCalender < PluginNicknameResponserBase
 	NAME = '老黄历插件'
 	AUTHOR = 'BR'
-	VERSION = '1.5'
+	VERSION = '1.6'
 	DESCRIPTION = '今日不宜：玩弄AI'
 	MANUAL = <<MANUAL.strip
 我的运势
@@ -94,7 +94,12 @@ MANUAL
 	COMMAND_FORTUNE  = '我的运势'
 	COMMAND_CALENDER = '今日黄历'
 	COMMAND_DICE     = '掷骰子'
-	COMMAND_CHOOSE   = /^(?<act>.+?)(还是)?不\k<act>/
+	COMMAND_CHOOSE   = /^(?<谁>.+?)(?<动作>.+?)(?<否定词>.)\k<动作>(?<剩余>.*)/
+
+	STRING_我 = '我'
+	STRING_你 = '你'
+
+	RESPONSE_FUCK = %w(滚你麻痹 玩蛋去 TM就知道玩AI 老问这种问题有救不 我是不会回答这种问题的 无路赛 你猜 …………)
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		# super # FOR DEBUG
@@ -118,15 +123,27 @@ MANUAL
 			response
 		when COMMAND_DICE
 			time = Time.now
-			"#{bot_name} 掷出了 #{random(get_seed(time) * time.sec * sender_qq, 5) % 6 + 1}" # 迷之伪随机5
+			"#{bot_name} 掷出了 #{random(get_seed(time) | time.sec | sender_qq, 5) % 6 + 1}" # 迷之伪随机5
 		else
 			if COMMAND_CHOOSE =~ message
-				act = $~[:act]
-				if random(get_seed(Time.now) * act.sum * sender_qq, 3) % 2 == 0 # 迷之伪随机3
-					"#{act}！"
+
+				谁 = $~[:谁]
+				动作 = $~[:动作]
+				否定词 = $~[:否定词]
+				剩余 = $~[:剩余]
+
+				if 谁 == STRING_你
+					RESPONSE_FUCK.sample
 				else
-					"不#{act}……"
+					回称 = (谁 == STRING_我) ? STRING_你 : 谁
+					if random(get_seed(Time.now) * (谁.sum * 动作.sum * 剩余.sum) | sender_qq, 3) % 2 == 0 # 迷之伪随机3
+						"#{回称}#{动作}#{剩余}！"
+					else
+						"#{回称}#{否定词}#{动作}#{剩余}……"
+					end
 				end
+
+
 			end
 		end
 	end

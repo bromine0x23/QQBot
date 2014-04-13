@@ -100,7 +100,7 @@ module WebQQProtocol
 
 		def get(uri)
 			log("HTTP GET: #{uri}", Logger::DEBUG) if $-d
-			Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == SCHEME_HTTPS, verify_mode: OpenSSL::SSL::VERIFY_NONE) do |http|
+			Net::HTTP.start(uri.host, uri.port, read_timeout: 10, use_ssl: uri.scheme == SCHEME_HTTPS, verify_mode: OpenSSL::SSL::VERIFY_NONE) do |http|
 				@header[KEY_COOKIE] = @cookies.to_s
 				response = http.request(Net::HTTP::Get.new(uri, @header))
 				@cookies.update!(response[KEY_SET_COOKIE]) if response[KEY_SET_COOKIE]
@@ -111,7 +111,7 @@ module WebQQProtocol
 
 		def post(uri, data)
 			log("HTTP POST: #{uri}\nDATA: #{data}", Logger::DEBUG) if $-d
-			Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == SCHEME_HTTPS, verify_mode: OpenSSL::SSL::VERIFY_NONE) do |http|
+			Net::HTTP.start(uri.host, uri.port, read_timeout: 10, use_ssl: uri.scheme == SCHEME_HTTPS, verify_mode: OpenSSL::SSL::VERIFY_NONE) do |http|
 				@header[KEY_COOKIE] = @cookies.to_s
 				response = http.request(Net::HTTP::Post.new(uri, @header), data)
 				@cookies.update!(response[KEY_SET_COOKIE]) if response[KEY_SET_COOKIE]
@@ -464,11 +464,11 @@ LOG
 		attr_reader :code, :info, :members
 
 		# @param [WebQQProtocol] client
-		def initialize(client, uin, code, name)
+		def initialize(client, group)
 			@client = client
-			@code = code
-			super(uin, @client.fetch_group_number(@code), name)
-			@info = client.fetch_group_info(code)
+			@code = group[JSON_KEY_CODE]
+			super(group[JSON_KEY_GID], @client.fetch_group_number(@code), group[JSON_KEY_NAME])
+			@info = @client.fetch_group_info(@code)
 			@members = {}
 			@member_names = {}
 			@info[JSON_KEY_MINFO].each do |member|
@@ -482,8 +482,8 @@ LOG
 		end
 
 		def member(uin)
-			return @members[uin] if @members[uin]
-			@members[uin] = QQGroupMember.new(@client, @member_names[uin], @client.fetch_qq_number(uin))
+			return @members[uin] if @members.has_key? uin
+			@members[uin] = QQGroupMember.new(uin, @client.fetch_qq_number(uin), @member_names[uin])
 		end
 	end
 
@@ -513,6 +513,7 @@ LOG
 
 		attr_reader :qq, :nickname
 		attr_reader :receiver, :sender
+		attr_reader :groups, :friends
 
 		def initialize(qq, nickname, client_id, random_key, ptwebqq, p_session_id, uin, verify_webqq, net_helper, logger)
 			@qq = qq
@@ -527,39 +528,51 @@ LOG
 
 			@receiver = MessageReceiver.new(@client_id, @p_session_id, @net_helper.cookies.to_s, logger)
 			@sender = MessageSender.new(@client_id, @p_session_id, @net_helper.cookies.to_s, logger)
-		end
 
-		# 返回群对象
-		# @return [Array[QQGroup]]
-		def groups
-			fetch_groups[JSON_KEY_GNAMELIST].map do |group|
-				QQGroup.new(self, group[JSON_KEY_GID], group[JSON_KEY_CODE], group[JSON_KEY_NAME])
+			json_data = fetch_groups
+			@group_list = {}
+			json_data[JSON_KEY_GNAMELIST].each do |group|
+				@group_list[group[JSON_KEY_GID]] = group
 			end
-		end
 
-		# 返回好友对象
-		# @return [Array[QQFriend]]
-		def friends
 			json_data = fetch_friends
-			marknames = json_data[JSON_KEY_MARKNAMES]
-			infos = json_data[JSON_KEY_INFO]
-			json_data[JSON_KEY_FRIENDS].map do |friend|
+			@friend_list = {}
+			friend_marknames = json_data[JSON_KEY_MARKNAMES]
+			friend_infos = json_data[JSON_KEY_INFO]
+			json_data[JSON_KEY_FRIENDS].each do |friend|
 				uin = friend[JSON_KEY_UIN]
-				markname = marknames.find{|markname| markname[JSON_KEY_UIN] == uin }
+				markname = friend_marknames.find{|markname| markname[JSON_KEY_UIN] == uin }
 				name = if markname
 						   markname[JSON_KEY_MARKNAME]
 					   else
-						   infos.find{ |info| info[JSON_KEY_UIN] == uin }[JSON_KEY_NICK]
+						   friend_infos.find{ |info| info[JSON_KEY_UIN] == uin }[JSON_KEY_NICK]
 					   end
-				QQFriend.new(uin, fetch_qq_number(uin), name)
+				@friend_list[uin] = name
 			end
+
+			@groups = {}
+			@friends = {}
+		end
+
+		def group(uin)
+			return @groups[uin] if @groups.has_key? uin
+			@groups[uin] = QQGroup.new(self, @group_list[uin]) if @group_list.has_key? uin
+		end
+
+		def friend(uin)
+			return @friends[uin] if @friends.has_key? uin
+			@friends[uin] = QQFriend.new(uin, fetch_qq_number(uin), @friend_list[uin]) if @friend_list.has_key? uin
+		end
+
+		def entity(uin)
+			@groups[uin] || @friends[uin]
 		end
 
 		# 添加好友
 		def add_friend(account)
 			json_data = allow_add_friend(account)
 			uin = json_data[JSON_KEY_TUIN]
-			QQFriend.new(uin, json_data[JSON_KEY_ACCOUNT], fetch_friend_info(uin)[JSON_KEY_NICK])
+			@friends[uin] = QQFriend.new(uin, json_data[JSON_KEY_ACCOUNT], fetch_friend_info(uin)[JSON_KEY_NICK])
 		end
 
 		# 登出

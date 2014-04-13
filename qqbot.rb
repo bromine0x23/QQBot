@@ -25,6 +25,7 @@ class QQBot
 			@plugins = []
 		end
 
+		#noinspection RubyResolve
 		def load_plugins
 			load SOURCE_PLUGIN
 			Dir.glob(PATH_PLUGINS).sort.each { |file_name| load file_name }
@@ -145,8 +146,6 @@ LOG
 	KEY_FROM_UIN = 'from_uin'
 
 	attr_reader :bot_name
-	attr_reader :groups
-	attr_reader :friends
 	attr_reader :masters
 	attr_reader :plugin_adminsrator
 
@@ -187,7 +186,6 @@ LOG
 		@message_receiver = @client.receiver
 		@message_sender = @client.sender
 		load_plugins
-		refresh_entities
 		begin
 			log('登录成功！')
 			puts 'QQBot已成功登录！'
@@ -276,72 +274,33 @@ LOG
 
 	# @return [WebQQProtocol::QQEntity]
 	def entity(uin)
-		@entities[uin]
+		@client.entity(uin)
 	end
 
 	# @return [WebQQProtocol::QQFriend]
 	def friend(uin)
-		@friends[uin]
+		@client.friend(uin)
 	end
 
 	# @return [WebQQProtocol::QQGroup]
 	def group(guin)
-		@groups[guin]
+		@client.group(guin)
 	end
 
 	# @return [WebQQProtocol::QQGroupMember]
 	def group_member(guin, uin)
-		@groups[guin].member(uin)
-	end
-
-	def refresh_entities
-		friends, groups = @client.friends, @client.groups
-		@friends, @groups = {}, {}
-		friends.each do |friend|
-			@friends[friend.uin] = friend
-		end
-		groups.each do |group|
-			@groups[group.uin] = group
-		end
-
-		@entities = @friends.merge @groups
-
-		true
+		group(guin).member(uin)
 	end
 
 	# @return [WebQQProtocol::QQFriend]
 	def add_friend(qq_number)
-		new_friend = @client.add_friend(qq_number)
-		@friends[new_friend.uin] = new_friend
-	end
-
-	# @return [WebQQProtocol::QQFriend]
-	def delete_friend(uin)
-		@friends.delete(uin)
+		@client.add_friend(qq_number)
 	end
 
 	private
 
 	def log(message, level = Logger::INFO)
 		@logger.log(level, message, self.class.name)
-	end
-
-	def save_entities
-		File.open('entities.txt', 'w') do |file|
-			@entities.each do |uid, entity|
-				if entity.is_a? WebQQProtocol::QQGroup
-					file << <<ENTITY << <<MEMBERS
-QQ群：#{entity} => #{uid}
-ENTITY
-#{entity.members.map{|member| "#{member} => #{member.uid}"}.join('\n') }
-MEMBERS
-				elsif entity.is_a? WebQQProtocol::QQFriend
-					file << <<ENTITY
-QQ用户：#{entity} => #{uid}
-ENTITY
-				end
-			end
-		end
 	end
 
 	def on_captcha_need(image_data)

@@ -1,16 +1,21 @@
 #!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
+require 'json'
+require 'net/http'
+require 'uri'
+
 class PluginCalender < PluginNicknameResponserBase
-	NAME = '老黄历插件'
+	NAME = '黄历插件'
 	AUTHOR = 'BR'
-	VERSION = '1.6'
+	VERSION = '1.7'
 	DESCRIPTION = '今日不宜：玩弄AI'
 	MANUAL = <<MANUAL.strip
 我的运势
 今日黄历
 掷骰子
-<ACT>还是不<ACT>呢
+<谁><动作>不<动作>XXXXX
+有谁生日
 MANUAL
 	PRIORITY = 0
 
@@ -93,13 +98,20 @@ MANUAL
 
 	COMMAND_FORTUNE  = '我的运势'
 	COMMAND_CALENDER = '今日黄历'
+	COMMAND_BIRTHDAY = '有谁生日'
 	COMMAND_DICE     = '掷骰子'
 	COMMAND_CHOOSE   = /^(?<谁>.+?)(?<动作>.+?)(?<否定词>.)\k<动作>(?<剩余>.*)/
 
 	STRING_我 = '我'
 	STRING_你 = '你'
 
-	RESPONSE_FUCK = %w(滚你麻痹 玩蛋去 TM就知道玩AI 老问这种问题有救不 我是不会回答这种问题的 无路赛 你猜 …………)
+	BIRTHDAY_DISPLAY_DOOR = 3
+
+	JSON_KEY_RESULT = 'result'
+	JSON_KEY_NAME = 'name'
+	JSON_KEY_ORIGIN = 'origin'
+
+	RESPONSE_FUCK = %w(滚你麻痹 玩蛋去 TM就知道玩AI！ 老问这种问题有救不！ 我是不会回答这种问题的 烦死了…… 你猜 ………… 不如问问隔壁安安子？)
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		# super # FOR DEBUG
@@ -121,6 +133,20 @@ MANUAL
 			response << "忌：\n"
 			bad_things(seed).each { |thing| response << "#{thing[:name]}:#{thing[:bad]}\n" }
 			response
+		when COMMAND_BIRTHDAY
+			json_data = JSON.parse(Net::HTTP.get(URI('http://shiningco.sinaapp.com/api/birthday')))
+			result = json_data[JSON_KEY_RESULT]
+			if result
+				response = ''
+				result.sample(BIRTHDAY_DISPLAY_DOOR).each do |data|
+					response << <<LINE
+#{data[JSON_KEY_NAME]}（#{data[JSON_KEY_ORIGIN]}）
+LINE
+				end
+				response
+			else
+				'没人生日'
+			end
 		when COMMAND_DICE
 			time = Time.now
 			"#{bot_name} 掷出了 #{random(get_seed(time) | time.sec | sender_qq, 5) % 6 + 1}" # 迷之伪随机5

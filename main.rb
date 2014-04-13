@@ -1,5 +1,7 @@
 require_relative 'qqbot'
 
+# $-d = true
+
 qqbot = QQBot.new
 
 loop do
@@ -8,6 +10,7 @@ loop do
 		qqbot.run
 	rescue Exception => ex
 		puts ex
+		puts ex.message
 		puts ex.backtrace
 		puts 'WebQQ已掉线，将在10秒后重启……'
 

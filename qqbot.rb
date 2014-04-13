@@ -13,7 +13,7 @@ class QQBot
 	LOAD_PLUGINS_PATH = './plugins/plugin*.rb'
 
 	class PluginAdministrator
-		SOURC_PLUGIN = './plugins/plugin.rb'
+		SOURCE_PLUGIN = './plugins/plugin.rb'
 		PATH_PLUGINS = './plugins/plugin?*.rb'
 		FILE_RULES = 'plugin_rules.yaml'
 
@@ -26,7 +26,7 @@ class QQBot
 		end
 
 		def load_plugins
-			load SOURC_PLUGIN
+			load SOURCE_PLUGIN
 			Dir.glob(PATH_PLUGINS).sort.each { |file_name| load file_name }
 			@plugins = []
 			PluginBase.instance_plugins.each { |plugin_class|
@@ -86,7 +86,7 @@ LOG
 
 		def enable_plugin(uin, qq_number, plugin)
 			entity = @qqbot.entity(uin)
-			if entity.is_a? WebQQClient::QQGroup
+			if entity.is_a? WebQQProtocol::QQGroup
 				group_number = entity.number
 				@rules[group_number][:forbidden_list].delete(plugin.class.name) if administrator?(group_number, qq_number)
 			end
@@ -95,7 +95,7 @@ LOG
 
 		def disable_plugin(uin, qq_number, plugin)
 			entity = @qqbot.entity(uin)
-			if entity.is_a? WebQQClient::QQGroup
+			if entity.is_a? WebQQProtocol::QQGroup
 				group_number = entity.number
 				@rules[group_number][:forbidden_list].add(plugin.class.name) if administrator?(group_number, qq_number)
 			end
@@ -120,7 +120,7 @@ LOG
 			from_entity = @qqbot.entity(from_uin)
 
 			@plugins.each do |plugin|
-				next if from_entity.is_a?(WebQQClient::QQGroup) and forbidden?(plugin.class.name, from_entity.number)
+				next if from_entity.is_a?(WebQQProtocol::QQGroup) and forbidden?(plugin.class.name, from_entity.number)
 				begin
 					break if plugin.send(event, value)
 				rescue Exception => ex
@@ -153,7 +153,6 @@ LOG
 	def initialize
 		load_config
 		init_logger
-		@client = WebQQClient.new(@qq, @password, @logger, self.method(:on_captcha_need))
 		@plugin_adminsrator = PluginAdministrator.new(self, @logger)
 	end
 
@@ -179,7 +178,12 @@ LOG
 
 	def run
 		log('开始运行……')
-		@client.login
+		begin
+			@client = WebQQProtocol.login(@qq, @password, @logger, self.method(:on_captcha_need))
+		rescue WebQQProtocol::LoginFailed
+			puts '登录失败'
+			raise
+		end
 		@message_receiver = @client.receiver
 		@message_sender = @client.sender
 		load_plugins
@@ -230,7 +234,7 @@ LOG
 
 	def plugins(uin)
 		entity = entity uin
-		entity.is_a?(WebQQClient::QQGroup) ? @plugin_adminsrator.filtered_plugins(entity.number) : @plugin_adminsrator.plugins
+		entity.is_a?(WebQQProtocol::QQGroup) ? @plugin_adminsrator.filtered_plugins(entity.number) : @plugin_adminsrator.plugins
 	end
 
 	def load_plugins
@@ -258,34 +262,34 @@ LOG
 	# @return [TrueClass or FalseClass]
 	def forbidden?(plugin_name, uin)
 		entity = entity uin
-		entity.is_a?(WebQQClient::QQGroup) and @plugin_adminsrator.forbidden?(plugin_name, entity.number)
+		entity.is_a?(WebQQProtocol::QQGroup) and @plugin_adminsrator.forbidden?(plugin_name, entity.number)
 	end
 
 	def administrator?(uin, qq_number)
 		entity = entity uin
-		entity.is_a?(WebQQClient::QQGroup) and @plugin_adminsrator.administrator?(entity.number, qq_number) or master?(qq_number)
+		entity.is_a?(WebQQProtocol::QQGroup) and @plugin_adminsrator.administrator?(entity.number, qq_number) or master?(qq_number)
 	end
 
 	def master?(qq_number)
 		@masters.include? qq_number
 	end
 
-	# @return [WebQQClient::QQEntity]
+	# @return [WebQQProtocol::QQEntity]
 	def entity(uin)
 		@entities[uin]
 	end
 
-	# @return [WebQQClient::QQFriend]
+	# @return [WebQQProtocol::QQFriend]
 	def friend(uin)
 		@friends[uin]
 	end
 
-	# @return [WebQQClient::QQGroup]
+	# @return [WebQQProtocol::QQGroup]
 	def group(guin)
 		@groups[guin]
 	end
 
-	# @return [WebQQClient::QQGroupMember]
+	# @return [WebQQProtocol::QQGroupMember]
 	def group_member(guin, uin)
 		@groups[guin].member(uin)
 	end
@@ -305,13 +309,13 @@ LOG
 		true
 	end
 
-	# @return [WebQQClient::QQFriend]
+	# @return [WebQQProtocol::QQFriend]
 	def add_friend(qq_number)
 		new_friend = @client.add_friend(qq_number)
 		@friends[new_friend.uin] = new_friend
 	end
 
-	# @return [WebQQClient::QQFriend]
+	# @return [WebQQProtocol::QQFriend]
 	def delete_friend(uin)
 		@friends.delete(uin)
 	end
@@ -325,13 +329,13 @@ LOG
 	def save_entities
 		File.open('entities.txt', 'w') do |file|
 			@entities.each do |uid, entity|
-				if entity.is_a? WebQQClient::QQGroup
+				if entity.is_a? WebQQProtocol::QQGroup
 					file << <<ENTITY << <<MEMBERS
 QQ群：#{entity} => #{uid}
 ENTITY
 #{entity.members.map{|member| "#{member} => #{member.uid}"}.join('\n') }
 MEMBERS
-				elsif entity.is_a? WebQQClient::QQFriend
+				elsif entity.is_a? WebQQProtocol::QQFriend
 					file << <<ENTITY
 QQ用户：#{entity} => #{uid}
 ENTITY

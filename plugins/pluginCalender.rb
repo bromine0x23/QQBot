@@ -8,7 +8,7 @@ require 'uri'
 class PluginCalender < PluginNicknameResponserBase
 	NAME = '黄历插件'
 	AUTHOR = 'BR'
-	VERSION = '1.7'
+	VERSION = '1.8'
 	DESCRIPTION = '今日不宜：玩弄AI'
 	MANUAL = <<MANUAL.strip
 我的运势
@@ -100,7 +100,7 @@ MANUAL
 	COMMAND_CALENDER = '今日黄历'
 	COMMAND_BIRTHDAY = '有谁生日'
 	COMMAND_DICE     = '掷骰子'
-	COMMAND_CHOOSE   = /^(?<谁>.+?)(?<动作>.+?)(?<否定词>.)\k<动作>(?<剩余>.*)/
+	COMMAND_CHOOSE   = /^(?<谁>.??)(?<动作>.+?)(?<否定词>.)\k<动作>(?<剩余>.*)/
 
 	STRING_我 = '我'
 	STRING_你 = '你'
@@ -160,15 +160,23 @@ LINE
 
 				if 谁 == STRING_你
 					RESPONSE_FUCK.sample
-				else
-					回称 = (谁 == STRING_我) ? STRING_你 : 谁
-					if random(get_seed(Time.now) * (谁.sum * 动作.sum * 剩余.sum) | sender_qq, 3) % 2 == 0 # 迷之伪随机3
-						"#{回称}#{动作}#{剩余}！"
+				elsif 谁 != ''
+					if 谁 == STRING_我
+						if random(get_seed(Time.now) * (动作.sum * 剩余.sum) | sender_qq, 3) % 2 == 0 # 迷之伪随机3
+							"你#{动作}#{剩余}！"
+						else
+							"你#{否定词}#{动作}#{剩余}……"
+						end
 					else
-						"#{回称}#{否定词}#{动作}#{剩余}……"
+						if random(get_seed(Time.now) * (谁.sum  * 动作.sum * 剩余.sum), 3) % 2 == 0 # 迷之伪随机3
+							"#{谁}#{动作}#{剩余}！"
+						else
+							"#{谁}#{否定词}#{动作}#{剩余}……"
+						end
 					end
+				else
+					'你问谁？'
 				end
-
 
 			end
 		end

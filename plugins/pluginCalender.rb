@@ -100,7 +100,7 @@ MANUAL
 	COMMAND_CALENDER = '今日黄历'
 	COMMAND_BIRTHDAY = '有谁生日'
 	COMMAND_DICE     = '掷骰子'
-	COMMAND_CHOOSE   = /^(?<谁>.??)(?<动作>.+?)(?<否定词>.)\k<动作>(?<剩余>.*)/
+	COMMAND_CHOOSE   = /^(?<谁>.??)(?<动作>\S)(?<否定词>[不没])\k<动作>(?<剩余>.*)/
 
 	STRING_我 = '我'
 	STRING_你 = '你'
@@ -111,7 +111,19 @@ MANUAL
 	JSON_KEY_NAME = 'name'
 	JSON_KEY_ORIGIN = 'origin'
 
-	RESPONSE_FUCK = %w(滚你麻痹 玩蛋去 TM就知道玩AI！ 老问这种问题有救不！ 我是不会回答这种问题的 烦死了…… 你猜 ………… 不如问问隔壁安安子？)
+	RESPONSE_FUCK = [
+		'滚你妈逼 ⊂彡☆))д`)',
+		'玩蛋去 ⊂彡☆))д´)',
+		'TM就知道玩AI！',
+		'老问这种问题有救不',
+		'你以为我会告诉你吗',
+		'我是不会回答这个问题的',
+		'烦死了',
+		'你猜',
+		'…………',
+		'不如问问隔壁安安子？',
+		'别着急要答案，来杯淡定红茶吧 ( ・_ゝ・)'
+	]
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		# super # FOR DEBUG

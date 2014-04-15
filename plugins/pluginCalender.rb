@@ -175,9 +175,9 @@ LINE
 				elsif 谁 != ''
 					if 谁 == STRING_我
 						if random(get_seed(Time.now) * (动作.sum * 剩余.sum) | sender_qq, 3) % 2 == 0 # 迷之伪随机3
-							"你#{动作}#{剩余}！"
+							"#{动作}#{剩余}！"
 						else
-							"你#{否定词}#{动作}#{剩余}……"
+							"#{否定词}#{动作}#{剩余}……"
 						end
 					else
 						if random(get_seed(Time.now) * (谁.sum  * 动作.sum * 剩余.sum), 3) % 2 == 0 # 迷之伪随机3

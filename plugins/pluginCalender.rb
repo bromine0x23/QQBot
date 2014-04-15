@@ -8,13 +8,14 @@ require 'uri'
 class PluginCalender < PluginNicknameResponserBase
 	NAME = '黄历插件'
 	AUTHOR = 'BR'
-	VERSION = '1.8'
+	VERSION = '1.9'
 	DESCRIPTION = '今日不宜：玩弄AI'
 	MANUAL = <<MANUAL.strip
 我的运势
 今日黄历
 掷骰子
 <谁><动作>不<动作>XXXXX
+<选择A>还是<选择B>
 有谁生日
 MANUAL
 	PRIORITY = 0
@@ -96,11 +97,12 @@ MANUAL
 		0x00A5B, 0x60A57, 0x0052B, 0x00A93, 0x40E95
 	]
 
-	COMMAND_FORTUNE  = '我的运势'
-	COMMAND_CALENDER = '今日黄历'
-	COMMAND_BIRTHDAY = '有谁生日'
-	COMMAND_DICE     = '掷骰子'
-	COMMAND_CHOOSE   = /^(?<谁>.??)(?<动作>\S)(?<否定词>[不没])\k<动作>(?<剩余>.*)/
+	COMMAND_FORTUNE    = '我的运势'
+	COMMAND_CALENDER   = '今日黄历'
+	COMMAND_BIRTHDAY   = '有谁生日'
+	COMMAND_DICE       = '掷骰子'
+	COMMAND_TRUE_FALSE = /^(?<谁>.+?)(?<动作>\S)(?<否定词>[不没])\k<动作>(?<剩余>.*)([呢]?)([?？]?)/
+	COMMAND_SELECT     = /^(?<选择A>.+)还是(?<选择B>.+?)([呢]?)([?？]?)/
 
 	STRING_我 = '我'
 	STRING_你 = '你'
@@ -114,15 +116,32 @@ MANUAL
 	RESPONSE_FUCK = [
 		'滚你妈逼 ⊂彡☆))д`)',
 		'玩蛋去 ⊂彡☆))д´)',
-		'TM就知道玩AI！',
+		'TM就知道玩AI',
+		'TMD能不玩AI吗',
+		'能不问我这种问题吗',
 		'老问这种问题有救不',
 		'你以为我会告诉你吗',
 		'我是不会回答这个问题的',
 		'烦死了',
+		'无路赛',
 		'你猜',
+		'你猜啊',
 		'…………',
-		'不如问问隔壁安安子？',
+		'······',
+		'不如问问隔壁安安子吧',
+		'不如问问我爸吧',
+		'不如问问我妈吧',
+		'不如问问神奇海螺吧',
+		'( ・_ゝ・)'
 		'别着急要答案，来杯淡定红茶吧 ( ・_ゝ・)'
+	]
+	
+	RESPONSE_WHO = [
+		'你问谁？',
+	]
+	
+	RESPONSE_SAME = [
+		'这TM不一样么',
 	]
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
@@ -149,11 +168,11 @@ MANUAL
 			json_data = JSON.parse(Net::HTTP.get(URI('http://shiningco.sinaapp.com/api/birthday')))
 			result = json_data[JSON_KEY_RESULT]
 			if result
-				response = ''
+				response = get_date_string(time)
+				response << get_lunar_date_string(time)
+				response << "今天生日的有：\n"
 				result.sample(BIRTHDAY_DISPLAY_DOOR).each do |data|
-					response << <<LINE
-#{data[JSON_KEY_NAME]}（#{data[JSON_KEY_ORIGIN]}）
-LINE
+					response << "#{data[JSON_KEY_NAME]}（#{data[JSON_KEY_ORIGIN]}）\n"
 				end
 				response
 			else
@@ -163,7 +182,7 @@ LINE
 			time = Time.now
 			"#{bot_name} 掷出了 #{random(get_seed(time) | time.sec | sender_qq, 5) % 6 + 1}" # 迷之伪随机5
 		else
-			if COMMAND_CHOOSE =~ message
+			if COMMAND_TRUE_FALSE =~ message
 
 				谁 = $~[:谁]
 				动作 = $~[:动作]
@@ -187,9 +206,21 @@ LINE
 						end
 					end
 				else
-					'你问谁？'
+					RESPONSE_WHO.sample
 				end
-
+			elsif COMMAND_SELECT =~ message
+				选择A = $~[:选择A]
+				选择B = $~[:选择B]
+				
+				if 选择A == 选择B
+					'这TM不一样么'
+				else
+					if random(get_seed(Time.now) * (谁.sum  * 动作.sum * 剩余.sum), 2) % 2 == 0 # 迷之伪随机2
+						选择A
+					else
+						选择B
+					end
+				end
 			end
 		end
 	end

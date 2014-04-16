@@ -6,7 +6,7 @@ require 'yaml'
 class PluginElement < PluginNicknameResponserBase
 	NAME = '化学元素插件'
 	AUTHOR = 'BR'
-	VERSION = '1.1'
+	VERSION = '1.2'
 	DESCRIPTION = '食我方块达人门捷列夫'
 	MANUAL = <<MANUAL.strip!
 化学元素 <元素名|元素序号>
@@ -19,7 +19,7 @@ MANUAL
 
 	def on_load
 		data = YAML.load_file(FILE_DATA)
-		@元素数据 = data[:元素数据]
+		@元素列表 = data[:元素列表]
 		@原子序号索引 = data[:原子序号索引]
 	end
 
@@ -41,7 +41,7 @@ MANUAL
 			element_name = $~[:element]
 			element_index = @原子序号索引[element_name]
 			if element_index
-				join_element_data(@元素数据[element_index])
+				join_element_data(@元素列表[element_index])
 			else
 				"无效的元素：#{element_name}"
 			end

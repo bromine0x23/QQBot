@@ -8,7 +8,7 @@ require 'uri'
 class PluginCalender < PluginNicknameResponserBase
 	NAME = '黄历插件'
 	AUTHOR = 'BR'
-	VERSION = '1.9'
+	VERSION = '1.10'
 	DESCRIPTION = '今日不宜：玩弄AI'
 	MANUAL = <<MANUAL.strip
 我的运势
@@ -101,8 +101,8 @@ MANUAL
 	COMMAND_CALENDER   = '今日黄历'
 	COMMAND_BIRTHDAY   = '有谁生日'
 	COMMAND_DICE       = '掷骰子'
-	COMMAND_TRUE_FALSE = /^(?<谁>.+?)(?<动作>\S)(?<否定词>[不没])\k<动作>(?<剩余>.*)([呢]?)([?？]?)/
-	COMMAND_SELECT     = /^(?<选择A>.+)还是(?<选择B>.+?)([呢]?)([?？]?)/
+	COMMAND_TRUE_FALSE = /^(?<谁>.??)(?<动作>\S+)(?<否定词>[不没])\k<动作>(?<剩余>.*)([呢]?)([?？]?)$/
+	COMMAND_SELECT     = /^(?<选择A>.+)还是(?<选择B>.+?)([呢]?)([?？]?)$/
 
 	STRING_我 = '我'
 	STRING_你 = '你'
@@ -132,8 +132,8 @@ MANUAL
 		'不如问问我爸吧',
 		'不如问问我妈吧',
 		'不如问问神奇海螺吧',
-		'( ・_ゝ・)'
-		'别着急要答案，来杯淡定红茶吧 ( ・_ゝ・)'
+		"（ ´_ゝ`)",
+		"别着急要答案，来杯淡定红茶吧（ ´_ゝ`)"
 	]
 	
 	RESPONSE_WHO = [
@@ -215,7 +215,7 @@ MANUAL
 				if 选择A == 选择B
 					'这TM不一样么'
 				else
-					if random(get_seed(Time.now) * (谁.sum  * 动作.sum * 剩余.sum), 2) % 2 == 0 # 迷之伪随机2
+					if random(get_seed(Time.now) * (选择A.sum  * 选择B.sum), 2) % 2 == 0 # 迷之伪随机2
 						选择A
 					else
 						选择B

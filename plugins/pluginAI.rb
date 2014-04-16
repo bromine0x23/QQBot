@@ -35,27 +35,28 @@ CREATE TABLE messages (
 	id         INTEGER PRIMARY KEY AUTOINCREMENT,
 	message    TEXT NOT NULL,
 	created_by INTEGER NOT NULL,
-	created_at TIMESTAMP
+	created_at TIMESTAMP,
+	CONSTRAINT uc_message UNIQUE (message)
 )
 SQL
 
 	SQL_CREATE_TABLE_RESPONSES = <<SQL
 CREATE TABLE responses (
 	id         INTEGER PRIMARY KEY AUTOINCREMENT,
-	response   TEXT,
+	response   TEXT NOT NULL,
 	created_by INTEGER NOT NULL,
-	created_at TIMESTAMP
+	created_at TIMESTAMP,
+	CONSTRAINT uc_response UNIQUE (response)
 )
 SQL
 
 	SQL_CREATE_TABLE_RELATIONS = <<SQL
 CREATE TABLE relations (
-	id          INTEGER PRIMARY KEY AUTOINCREMENT,
 	message_id  INTEGER REFERENCES messages (id),
 	response_id INTEGER REFERENCES response (id),
 	created_by  INTEGER NOT NULL,
 	created_at  TIMESTAMP,
-	CONSTRAINT uc_relation UNIQUE (message_id, response_id)
+	CONSTRAINT pk_relation PRIMARY KEY (message_id, response_id)
 )
 SQL
 
@@ -76,11 +77,11 @@ SELECT id FROM responses WHERE response = ?
 SQL
 
 	SQL_INSERT_MESSAGE = <<SQL
-INSERT INTO messages (message, created_by, created_at) VALUES (?, ?, ?)
+INSERT OR IGNORE INTO messages (message, created_by, created_at) VALUES (?, ?, ?)
 SQL
 
 	SQL_INSERT_RESPONSE = <<SQL
-INSERT INTO responses (response, created_by, created_at) VALUES (?, ?, ?)
+INSERT OR IGNORE INTO responses (response, created_by, created_at) VALUES (?, ?, ?)
 SQL
 
 	SQL_INSERT_RELATION = <<SQL

@@ -17,4 +17,9 @@ tmp
 _yardoc
 doc/
 
+# 配置文件
 *.config
+*.yaml
+
+# 数据库文件
+*.db

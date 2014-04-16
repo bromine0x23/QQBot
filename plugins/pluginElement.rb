@@ -6,22 +6,14 @@ require 'yaml'
 class PluginElement < PluginNicknameResponserBase
 	NAME = '化学元素插件'
 	AUTHOR = 'BR'
-	VERSION = '1.2'
+	VERSION = '1.4'
 	DESCRIPTION = '食我方块达人门捷列夫'
 	MANUAL = <<MANUAL.strip!
-化学元素 <元素名|元素序号>
+[化学]元素 <元素名|元素序号>
 MANUAL
 	PRIORITY = 0
 
-	COMMAND_PATTERN = /^化学元素\s*(?<element>.+)/
-
-	FILE_DATA = file_path __FILE__, 'pluginElement.data'
-
-	def on_load
-		data = YAML.load_file(FILE_DATA)
-		@元素列表 = data[:元素列表]
-		@原子序号索引 = data[:原子序号索引]
-	end
+	COMMAND_PATTERN = /^(化学)?元素\s*(?<element>.+)/
 
 	def join_element_data(element)
 		string = "No.#{element[:原子序数]} #{element[:符号]}（"
@@ -39,9 +31,9 @@ MANUAL
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		if COMMAND_PATTERN =~ message
 			element_name = $~[:element]
-			element_index = @原子序号索引[element_name]
+			element_index = @data[:原子序号索引][element_name]
 			if element_index
-				join_element_data(@元素列表[element_index])
+				join_element_data(@data[:元素列表][element_index])
 			else
 				"无效的元素：#{element_name}"
 			end

@@ -8,52 +8,17 @@ require 'uri'
 class PluginCalender < PluginNicknameResponserBase
 	NAME = '黄历插件'
 	AUTHOR = 'BR'
-	VERSION = '1.10'
+	VERSION = '1.11'
 	DESCRIPTION = '今日不宜：玩弄AI'
 	MANUAL = <<MANUAL.strip
 我的运势
 今日黄历
 掷骰子
 <谁><动作>不<动作>XXXXX
-<选择A>还是<选择B>
+<选择1>还是<选择2>
 有谁生日
 MANUAL
 	PRIORITY = 0
-
-	THINGS = [
-		{name: '组模型', good: '今天的喷漆会很完美', bad: '精神不集中板件被剪断了'},
-		{name: '投稿情感区', good: '问题圆满解决', bad: '会被当事人发现'},
-		{name: '逛匿名版', good: '今天也要兵库北', bad: '看到丧尸在晒妹'},
-		{name: '和女神聊天', good: '女神好感度上升', bad: '我去洗澡了，呵呵'},
-		{name: '熬夜', good: '夜间的效率更高', bad: '明天有很重要的事'},
-		{name: '锻炼', good: '八分钟给你比利般的身材', bad: '会拉伤肌肉'},
-		{name: '散步', good: '遇到妹子主动搭讪', bad: '走路会踩到水坑'},
-		{name: '打排位赛', good: '遇到大腿上分500', bad: '我方三人挂机'},
-		{name: '汇报工作', good: '被夸奖工作认真', bad: '上班偷玩游戏被扣工资'},
-		{name: '抚摸猫咪', good: '才不是特意蹭你的呢', bad: '死开！愚蠢的人类'},
-		{name: '遛狗', good: '遇见女神遛狗搭讪', bad: '狗狗随地大小便被罚款'},
-		{name: '烹饪', good: '黑暗料理界就由我来打败', bad: '难道这就是……仰望星空派？'},
-		{name: '告白', good: '其实我也喜欢你好久了', bad: '对不起，你是一个好人'},
-		{name: '追新番', good: '完结之前我绝不会死', bad: '会被剧透'},
-		{name: '打卡日常', good: '怒回首页', bad: '会被老板发现'},
-		{name: '下副本', good: '配合默契一次通过', bad: '会被灭到散团'},
-		{name: '抢沙发', good: '沙发入手弹无虚发', bad: '会被挂起来羞耻play'},
-		{name: '网购', good: '商品大减价', bad: '问题产品需要退换'},
-		{name: '跳槽', good: '新工作待遇大幅提升', bad: '再忍一忍就加薪了'},
-		{name: '读书', good: '知识就是力量', bad: '注意力完全无法集中'},
-		{name: '早睡', good: '早睡早起方能养生', bad: '会在半夜醒来，然后失眠'},
-		{name: '逛街', good: '物美价廉大优惠', bad: '会遇到奸商'},
-		{name: '写单元测试', good: '写单元测试将减少出错',bad: '写单元测试会降低你的开发效率'},
-		{name: '洗澡', good: '你几天没洗澡了？',bad: '会把设计方面的灵感洗掉'},
-		{name: '重构', good: '代码质量得到提高',bad: '你很有可能会陷入泥潭'},
-		{name: '在妹子面前吹牛', good: '改善你矮穷挫的形象',bad: '会被识破'},
-		{name: '打DOTA', good: '你将有如神助',bad: '你会被虐的很惨'},
-		{name: '修复BUG', good: '你今天对BUG的嗅觉大大提高', bad: '新产生的BUG将比修复的更多'},
-		{name: '上微博', good: '今天发生的事不能错过',bad: '今天的微博充满负能量'},
-		{name: '上AB站', good: '还需要理由吗？',bad: '满屏兄贵亮瞎你的眼'},
-		{name: '玩FlappyBird', good: '今天破纪录的几率很高',bad: '除非你想玩到把手机砸了'},
-		{name: '玩2048', good: '今天组出248的几率很高',bad: '除非你想玩到把电脑砸了'}
-	]
 
 	STR_TG    = '甲乙丙丁戊己庚辛壬癸'
 	STR_DZ    = '子丑寅卯辰巳午未申酉戌亥'
@@ -101,48 +66,29 @@ MANUAL
 	COMMAND_CALENDER   = '今日黄历'
 	COMMAND_BIRTHDAY   = '有谁生日'
 	COMMAND_DICE       = '掷骰子'
-	COMMAND_TRUE_FALSE = /^(?<谁>.??)(?<动作>\S+)(?<否定词>[不没])\k<动作>(?<剩余>.*)([呢]?)([?？]?)$/
-	COMMAND_SELECT     = /^(?<选择A>.+)还是(?<选择B>.+?)([呢]?)([?？]?)$/
+	COMMAND_TRUE_FALSE = /^(?<WHO>.??)(?<ACT>.+)(?<NEG>[不没])\k<ACT>(?<ETC>.*)([呢]?)([?？]?)$/
+	COMMAND_SELECT     = /^(?<SELECT1>.+)还是(?<SELECT2>.+?)([呢]?)([?？]?)$/
 
-	STRING_我 = '我'
-	STRING_你 = '你'
-
-	BIRTHDAY_DISPLAY_DOOR = 3
+	STRING_I = '我'
+	STRING_YOU = '你'
 
 	JSON_KEY_RESULT = 'result'
 	JSON_KEY_NAME = 'name'
 	JSON_KEY_ORIGIN = 'origin'
 
-	RESPONSE_FUCK = [
-		'滚你妈逼 ⊂彡☆))д`)',
-		'玩蛋去 ⊂彡☆))д´)',
-		'TM就知道玩AI',
-		'TMD能不玩AI吗',
-		'能不问我这种问题吗',
-		'老问这种问题有救不',
-		'你以为我会告诉你吗',
-		'我是不会回答这个问题的',
-		'烦死了',
-		'无路赛',
-		'你猜',
-		'你猜啊',
-		'…………',
-		'······',
-		'不如问问隔壁安安子吧',
-		'不如问问我爸吧',
-		'不如问问我妈吧',
-		'不如问问神奇海螺吧',
-		"（ ´_ゝ`)",
-		"别着急要答案，来杯淡定红茶吧（ ´_ゝ`)"
-	]
-	
-	RESPONSE_WHO = [
-		'你问谁？',
-	]
-	
-	RESPONSE_SAME = [
-		'这TM不一样么',
-	]
+	CONFIG_FILE = file_path __FILE__, 'pluginCalender.config'
+
+	def on_load
+		on_load_config
+	end
+
+	def on_load_config
+		# super # FOR DEBUG
+		config = YAML.load_file CONFIG_FILE
+		@things = config[:things]
+		@responces = config[:responces]
+		@birthday = config[:birthday]
+	end
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		# super # FOR DEBUG
@@ -158,7 +104,7 @@ MANUAL
 			seed = get_seed(time)
 			response = get_date_string(time)
 			response << get_lunar_date_string(time)
-			@things = THINGS.clone
+			@tmp_things = @things.clone
 			response << "宜：\n"
 			good_things(seed).each { |thing| response << "#{thing[:name]}:#{thing[:good]}\n" }
 			response << "忌：\n"
@@ -171,12 +117,12 @@ MANUAL
 				response = get_date_string(time)
 				response << get_lunar_date_string(time)
 				response << "今天生日的有：\n"
-				result.sample(BIRTHDAY_DISPLAY_DOOR).each do |data|
+				result.sample(@birthday[:display_line]).each do |data|
 					response << "#{data[JSON_KEY_NAME]}（#{data[JSON_KEY_ORIGIN]}）\n"
 				end
 				response
 			else
-				'没人生日'
+				@responces[:nobody].sample
 			end
 		when COMMAND_DICE
 			time = Time.now
@@ -184,41 +130,41 @@ MANUAL
 		else
 			if COMMAND_TRUE_FALSE =~ message
 
-				谁 = $~[:谁]
-				动作 = $~[:动作]
-				否定词 = $~[:否定词]
-				剩余 = $~[:剩余]
+				who = $~[:WHO]
+				act = $~[:ACT]
+				neg = $~[:NEG]
+				etc = $~[:ETC]
 
-				if 谁 == STRING_你
-					RESPONSE_FUCK.sample
-				elsif 谁 != ''
-					if 谁 == STRING_我
-						if random(get_seed(Time.now) * (动作.sum * 剩余.sum) | sender_qq, 3) % 2 == 0 # 迷之伪随机3
-							"#{动作}#{剩余}！"
+				if who == STRING_YOU
+					@responces[:fuck].sample
+				elsif who  != ''
+					if who == STRING_I
+						if random(get_seed(Time.now) * (act.sum * etc.sum) | sender_qq, 3) % 2 == 0 # 迷之伪随机3
+							"#{act}#{etc}！"
 						else
-							"#{否定词}#{动作}#{剩余}……"
+							"#{neg}#{act}#{etc}……"
 						end
 					else
-						if random(get_seed(Time.now) * (谁.sum  * 动作.sum * 剩余.sum), 3) % 2 == 0 # 迷之伪随机3
-							"#{谁}#{动作}#{剩余}！"
+						if random(get_seed(Time.now) * (who.sum  * act.sum * etc.sum), 3) % 2 == 0 # 迷之伪随机3
+							"#{who}#{act}#{etc}！"
 						else
-							"#{谁}#{否定词}#{动作}#{剩余}……"
+							"#{who}#{neg}#{act}#{etc}……"
 						end
 					end
 				else
-					RESPONSE_WHO.sample
+					@responces[:who].sample
 				end
 			elsif COMMAND_SELECT =~ message
-				选择A = $~[:选择A]
-				选择B = $~[:选择B]
-				
-				if 选择A == 选择B
-					'这TM不一样么'
+				select1 = $~[:SELECT1]
+				select2 = $~[:SELECT2]
+
+				if select1 == select2
+					@responces[:same].sample
 				else
-					if random(get_seed(Time.now) * (选择A.sum  * 选择B.sum), 2) % 2 == 0 # 迷之伪随机2
-						选择A
+					if random(get_seed(Time.now) * (select1.sum * select2.sum), 2).odd?
+						select1
 					else
-						选择B
+						select2
 					end
 				end
 			end
@@ -226,22 +172,26 @@ MANUAL
 	end
 
 	# 迷之伪随机
+	# @return [Integer]
 	def random(a, b)
 		n = a % 11117
 		(25+b).times { n = n * n % 11117 }
 		n
 	end
 
+	# @return [Integer]
 	def get_seed(date)
 		date.year * 37621 + (date.month + 1) * 539 + date.day
 	end
 
+	# @return [String]
 	def get_date_string(date)
 		<<STRING
 #{date.year}年#{date.month}月#{date.day}日 周#{STR_WEEK[date.wday]}
 STRING
 	end
 
+	# @return [String]
 	def get_lunar_date_string(date)
 		year  = date.year
 		month = date.month
@@ -281,21 +231,23 @@ STRING
 DATE
 	end
 
+	# @return [Array[Hash]]
 	def good_things(seed)
 		good_things = []
 		sg = random(seed, 8) % 100 # 迷之伪随机8
 		(random(seed, 9) % 3 + 1).times do # 迷之伪随机9
-			good_things << @things.delete_at((sg * 0.01 * @things.size).to_i)
+			good_things << @tmp_things.delete_at((sg * 0.01 * @tmp_things.size).to_i)
 
 		end
 		good_things
 	end
 
+	# @return [Array[Hash]]
 	def bad_things(seed)
 		bad_things = []
 		sb = random(seed, 4) % 100 # 迷之伪随机4
 		(random(seed, 7) % 3 + 1).times do # 迷之伪随机7
-			bad_things << @things.delete_at((sb * 0.01 * @things.size).to_i)
+			bad_things << @tmp_things.delete_at((sb * 0.01 * @tmp_things.size).to_i)
 		end
 		bad_things
 	end

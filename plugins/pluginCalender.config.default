@@ -1,0 +1,64 @@
+---
+:things:
+- :thing: 写单元测试
+  :good: 写单元测试将减少出错
+  :bad: 写单元测试会降低你的开发效率
+- :thing: 修复BUG
+  :good: 你今天对BUG的嗅觉大大提高
+  :bad: 新产生的BUG将比修复的更多
+- :thing: 熬夜
+  :good: 夜间的效率更高
+  :bad: 明天有很重要的事
+- :thing: 早睡
+  :good: 早睡早起方能养生
+  :bad: 会在半夜醒来，然后失眠
+- :thing: 洗澡
+  :good: 你几天没洗澡了？
+  :bad: 会把设计方面的灵感洗掉
+- :thing: 散步
+  :good: 遇到妹子主动搭讪
+  :bad: 走路会踩到水坑
+- :thing: 读书
+  :good: 知识就是力量
+  :bad: 注意力完全无法集中
+- :thing: 重构
+  :good: 代码质量得到提高
+  :bad: 你很有可能会陷入泥潭
+- :thing: 汇报工作
+  :good: 被夸奖工作认真
+  :bad: 上班偷玩游戏被扣工资
+- :thing: 打DOTA
+  :good: 你将有如神助
+  :bad: 你会被虐的很惨
+- :thing: 烹饪
+  :good: 黑暗料理界就由我来打败
+  :bad: 难道这就是……仰望星空派？
+- :thing: 抚摸猫咪
+  :good: 才不是特意蹭你的呢
+  :bad: 死开！愚蠢的人类
+- :thing: 和女神聊天
+  :good: 女神好感度上升
+  :bad: 我去洗澡了，呵呵
+- :thing: 遛狗
+  :good: 遇见女神遛狗搭讪
+  :bad: 狗狗随地大小便被罚款
+- :thing: 逛街
+  :good: 物美价廉大优惠
+  :bad: 会遇到奸商
+- :thing: 在妹子面前吹牛
+  :good: 改善你矮穷挫的形象
+  :bad: 会被识破
+:birthday:
+  :display_line: 3
+:responces:
+  :fuck:
+  - 你猜
+  - 你猜啊
+  - …………
+  - ······
+  :who:
+  - 你问谁？
+  :same:
+  - 这TM不一样么
+  :nobody:
+  - 没人生日

@@ -67,7 +67,6 @@ MANUAL
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		# super # FOR DEBUG
-
 		if COMMAND_PATTERN =~ message
 			day_str  = $~[:day]
 			week_str = $~[:week]

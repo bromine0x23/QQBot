@@ -14,7 +14,7 @@ require 'rexml/document'
 class PluginEVE < PluginNicknameResponserBase
 	NAME = 'EVE插件'
 	AUTHOR = 'BR'
-	VERSION = '1.5'
+	VERSION = '1.7'
 	DESCRIPTION = '我们的征途的星辰大海'
 	MANUAL = <<MANUAL.strip
 == 吉他价格查询 ==
@@ -22,8 +22,6 @@ EVE 市场 <物品>（用逗号(,，)分割）
 EVE 基础矿物
 MANUAL
 	PRIORITY = 0
-
-	CONFIG_FILE = file_path __FILE__, 'pluginEVE.data'
 	
 	COMMAND_PATTERN = /^EVE\s*(?<command>.+)/i
 	MARKET_PATTERN  = /^市场\s*(?<item_names>.+)/
@@ -42,19 +40,12 @@ MANUAL
 	PATTERN_THOUSAND_SEPARATOR = /(?<=\d)(?=(\d\d\d)+\.)/
 	THOUSAND_SEPARATOR = ','
 
-	def on_load
-		# super # FOR DEBUG
-		@items = YAML.load_file CONFIG_FILE
-		log('物品名数据加载完毕', Logger::DEBUG) if $-d
-	end
-
 	def format_price(price)
 		price.gsub(PATTERN_THOUSAND_SEPARATOR, THOUSAND_SEPARATOR)
 	end
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		# super # FOR DEBUG
-
 		if COMMAND_PATTERN =~ message
 			command = $~[:command]
 			if MINERAL_PATTERN =~ command
@@ -68,8 +59,8 @@ RESPONSE
 			elsif MARKET_PATTERN =~ command 
 				response = response_header_with_nickname sender_nickname
 				$~[:item_names].split(PATTERN_ITEM_NAMES_SEPARATOR).each do |item_name|
-					if @items.has_key? item_name
-						json_data = JSON.parse(Net::HTTP.get(URI("http://www.ceve-market.org/api/market/region/10000002/system/30000142/type/#{@items[item_name]}.json")))
+					if @datas.has_key? item_name
+						json_data = JSON.parse(Net::HTTP.get(URI("http://www.ceve-market.org/api/market/region/10000002/system/30000142/type/#{@datas[item_name]}.json")))
 						buy  = json_data[JSON_KEY_BUY][JSON_KEY_MAX]
 						sell = json_data[JSON_KEY_SELL][JSON_KEY_MIN]
 						response << <<RESPONSE

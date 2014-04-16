@@ -10,6 +10,8 @@ class PluginBase
 MANUAL
 	PRIORITY = 0
 
+	PLUGIN_DIRECTORY = File.dirname(__FILE__)
+
 	@@plugins = []
 	@@instance_plugins = []
 
@@ -68,7 +70,16 @@ MANUAL
 	end
 
 	def on_load
-		# 桩方法
+		file_name = self.class.name
+		file_name[0] = file_name[0].downcase
+
+		config_file = "#{PLUGIN_DIRECTORY}/#{file_name}.config"
+		if Dir.exist? config_file
+			YAML.load_file(config_file).each_pair { |key, value| instance_variable_set(:"@#{key}", value) }
+		end
+
+		data_file = "#{PLUGIN_DIRECTORY}/#{file_name}.data"
+		@data   = YAML.load_file(data_file) if Dir.exist? data_file
 	end
 
 	def on_unload

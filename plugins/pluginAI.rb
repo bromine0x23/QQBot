@@ -6,7 +6,7 @@ require 'sqlite3'
 class PluginAI < PluginNicknameResponserBase
 	NAME = 'AI插件'
 	AUTHOR = 'BR'
-	VERSION = '1.10'
+	VERSION = '1.11'
 	DESCRIPTION = '人家才不是AI呢'
 	MANUAL = <<MANUAL.strip!
 == 复述 ==
@@ -28,12 +28,13 @@ class PluginAI < PluginNicknameResponserBase
 MANUAL
 	PRIORITY = -8
 
-	DB_FILE = file_path __FILE__, 'pluginAI.db'
+	DB_FILE = "#{PLUGIN_DIRECTORY}/pluginAI.db"
 
 	SQL_CREATE_TABLE_MESSAGES = <<SQL
 CREATE TABLE messages (
 	id         INTEGER PRIMARY KEY AUTOINCREMENT,
 	message    TEXT NOT NULL,
+	created_by INTEGER NOT NULL,
 	created_at TIMESTAMP
 )
 SQL
@@ -41,15 +42,25 @@ SQL
 	SQL_CREATE_TABLE_RESPONSES = <<SQL
 CREATE TABLE responses (
 	id         INTEGER PRIMARY KEY AUTOINCREMENT,
-	message_id INTEGER REFERENCES messages (id),
 	response   TEXT,
 	created_by INTEGER NOT NULL,
 	created_at TIMESTAMP
 )
 SQL
 
-	SQL_CREATE_INDEX_ON_RESPONSES = <<SQL
-CREATE INDEX index_message_id ON responses (message_id)
+	SQL_CREATE_TABLE_RELATIONS = <<SQL
+CREATE TABLE relations (
+	id          INTEGER PRIMARY KEY AUTOINCREMENT,
+	message_id  INTEGER REFERENCES messages (id),
+	response_id INTEGER REFERENCES response (id),
+	created_by  INTEGER NOT NULL,
+	created_at  TIMESTAMP,
+	CONSTRAINT uc_relation UNIQUE (message_id, response_id)
+)
+SQL
+
+	SQL_CREATE_INDEX_RELATIONS = <<SQL
+CREATE INDEX index_message_id ON relations (message_id)
 SQL
 
 	SQL_CHECK_TABLE = <<SQL
@@ -57,44 +68,45 @@ SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?
 SQL
 
 	SQL_GET_MESSAGE_ID = <<SQL
-SELECT id
-FROM messages
-WHERE message = ?
+SELECT id FROM messages WHERE message = ?
 SQL
 
-	SQL_GET_RESPONSES = <<SQL
-SELECT response
-FROM responses
-WHERE message_id IN (
-	SELECT id
-	FROM messages
-	WHERE message = ?
+	SQL_GET_RESPONSE_ID = <<SQL
+SELECT id FROM responses WHERE response = ?
+SQL
+
+	SQL_INSERT_MESSAGE = <<SQL
+INSERT INTO messages (message, created_by, created_at) VALUES (?, ?, ?)
+SQL
+
+	SQL_INSERT_RESPONSE = <<SQL
+INSERT INTO responses (response, created_by, created_at) VALUES (?, ?, ?)
+SQL
+
+	SQL_INSERT_RELATION = <<SQL
+INSERT OR IGNORE
+	INTO relations (message_id, response_id, created_by, created_at)
+	SELECT messages.id, responses.id, ?, ? FROM messages, responses WHERE message = ? AND response = ?
+SQL
+
+	SQL_SELECT_RESPONSES = <<SQL
+SELECT response FROM responses
+WHERE id = (
+	SELECT response_id FROM relations
+	WHERE message_id = (
+		SELECT id FROM messages
+		WHERE message = ?
+	)
 )
 SQL
 
-	SQL_SET_MESSAGE = <<SQL
-INSERT INTO messages (message, created_at) VALUES (?, ?)
-SQL
-
-	SQL_SET_RESPONSE = <<SQL
-INSERT INTO responses (message_id, response, created_by, created_at)
-SELECT id, ?, ?, ?
-FROM messages
-WHERE message = ?
-SQL
-
-	SQL_REMOVE_RESPONSES = <<SQL
-DELETE
-FROM responses
-WHERE message_id IN (
-	SELECT id
-	FROM messages
+	SQL_DELETE_RELATIONS = <<SQL
+DELETE FROM relations
+WHERE message_id = (
+	SELECT id FROM messages
 	WHERE message = ?
 )
 SQL
-
-	TABLE_MESSAGES  = 'messages'
-	TABLE_RESPONSES = 'responses'
 
 	COMMAND_SAY             = /^说(?<response>.*)/m
 	COMMAND_FORGET          = /^忘记(?<message>.*)/m
@@ -104,78 +116,76 @@ SQL
 	COMMAND_LEARN_TOWLINE   = /^[\r\n](?<message>[^\r\n]+)[\r\n]+(?<response>.+)/m
 	COMMAND_LEARN_MULTILINE = /^=(?<delimiter>\w+)\s*[\r\n](?<message>.+?)[\r\n]\k<delimiter>(?<response>.+)/m
 
-	RESPONSE_TOOLONG      = %w(那太长了…… 这么长人家完全记不住嘛 好长……)
-	RESPONSE_LEARNED      = %w(诶……是这样嘛? 了解了 哦，原来如此 恩 了解)
-	RESPONSE_FORGETED     = %w(Accept 记忆已清除)
-	RESPONSE_NULL         = %w(喵 喵呜 汪 ≧ω≦喵！)
-	RESPONSE_UNKOWN_ERROR = %w(未知错误 好像哪里不对)
-	RESPONSE_DOOR = 512
+	PLACEHOLDER_I   = '{我}'
+	PLACEHOLDER_YOU = '{你}'
 
 	def on_load
-		# super # FOR DEBUG
+		super
+		prepare_db
+	end
+
+	def prepare_db
 		@db = SQLite3::Database.open DB_FILE
-		@db.execute SQL_CREATE_TABLE_MESSAGES if @db.get_first_value(SQL_CHECK_TABLE, TABLE_MESSAGES).zero?
-		if @db.get_first_value(SQL_CHECK_TABLE, TABLE_RESPONSES).zero?
-			@db.execute SQL_CREATE_TABLE_RESPONSES
-			@db.execute SQL_CREATE_INDEX_ON_RESPONSES
+		@db.execute SQL_CREATE_TABLE_MESSAGES  if @db.get_first_value(SQL_CHECK_TABLE, 'messages').zero?
+		@db.execute SQL_CREATE_TABLE_RESPONSES if @db.get_first_value(SQL_CHECK_TABLE, 'responses').zero?
+		if @db.get_first_value(SQL_CHECK_TABLE, 'relations').zero?
+			@db.execute SQL_CREATE_TABLE_RELATIONS
+			@db.execute SQL_CREATE_INDEX_RELATIONS
 		end
-		log('数据库连接完毕', Logger::DEBUG) if $-d
+		log('数据库准备完毕', Logger::DEBUG) if $-d
 	end
 
 	def on_unload
-		# super # FOR DEBUG
+		super
 		@db.close
 		log('数据库连接断开', Logger::DEBUG) if $-d
 	end
 
-	def get_response(uin, sender_qq, sender_nickname, message, time)
+	def get_response(uin, sender_qq, sender_nickname, command, time)
 		# super # FOR DEBUG
-		if COMMAND_SAY =~ message
-			$~[:response]
-		elsif COMMAND_FORGET =~ message
-			forget $~[:message].strip
-			RESPONSE_FORGETED.sample
-		elsif COMMAND_LEARN =~ message
+		function_say(command) or function_forget(command) or function_learn(command, sender_qq) or function_response(command, sender_nickname)
+	end
+
+	def function_say(command)
+		$~[:response] if COMMAND_SAY =~ command
+	end
+
+	def function_forget(command)
+		if COMMAND_FORGET =~ command
+			@db.transaction do |db|
+				db.execute(SQL_DELETE_RELATIONS, $~[:message].strip)
+			end
+			@responses[:forgeted].sample
+		end
+	end
+
+	def function_learn(command, sender_qq)
+		if COMMAND_LEARN =~ command
 			command = $~[:command]
 			if COMMAND_LEARN_MULTILINE =~ command or COMMAND_LEARN_TOWLINE =~ command or COMMAND_LEARN_ONELINE =~ command
 				response = $~[:response].strip
-				if response.length < RESPONSE_DOOR
-					learn $~[:message].strip, response, sender_qq
-					RESPONSE_LEARNED.sample
+				if response.length < @responce_limit
+					message = $~[:message].strip
+					@db.transaction do |db|
+						time = Time.now.to_i
+						db.execute(SQL_INSERT_MESSAGE, message, sender_qq, time) unless db.get_first_value(SQL_GET_MESSAGE_ID, message)
+						db.execute(SQL_INSERT_RESPONSE, response, sender_qq, time) unless db.get_first_value(SQL_GET_RESPONSE_ID, response)
+						db.execute(SQL_INSERT_RELATION, sender_qq, time, message, response)
+					end
+					@responses[:learned].sample
 				else
-					RESPONSE_TOOLONG.sample
+					@responses[:toolong].sample
 				end
 			end
-		else
-			response(message, sender_nickname)
 		end
 	end
 
-	def learn(message, response, created_by)
-		@db.transaction do |db|
-			time = Time.now.to_i
-			unless db.get_first_value SQL_GET_MESSAGE_ID, message
-				db.execute SQL_SET_MESSAGE, message, time
-			end
-			db.execute SQL_SET_RESPONSE, response, created_by, time, message
-		end
-	end
-
-	def forget(message, _ = nil)
-		@db.transaction do |db|
-			db.execute SQL_REMOVE_RESPONSES, message
-		end
-	end
-
-	PLACEHOLDER_I = '{我}'
-	PLACEHOLDER_YOU = '{你}'
-
-	def response(message, sender_nickname)
-		result = @db.execute(SQL_GET_RESPONSES, message).map!{ |row| row[0] }.sample
+	def function_response(command, sender_nickname)
+		result = @db.execute(SQL_SELECT_RESPONSES, command).map!{ |row| row[0] }.sample
 		if result
-			result.gsub(/\{我\}|\{你\}/, PLACEHOLDER_I => bot_name, PLACEHOLDER_YOU => sender_nickname)
+			result.gsub(/#{PLACEHOLDER_I}|#{PLACEHOLDER_YOU}/, PLACEHOLDER_I => bot_name, PLACEHOLDER_YOU => sender_nickname)
 		else
-			RESPONSE_NULL.sample
+			@responses[:null].sample
 		end
 	end
 end

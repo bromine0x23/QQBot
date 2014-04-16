@@ -92,7 +92,7 @@ SQL
 
 	SQL_SELECT_RESPONSES = <<SQL
 SELECT response FROM responses
-WHERE id = (
+WHERE id IN (
 	SELECT response_id FROM relations
 	WHERE message_id = (
 		SELECT id FROM messages

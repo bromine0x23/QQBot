@@ -6,7 +6,7 @@ require 'yaml'
 class PluginElement < PluginNicknameResponserBase
 	NAME = '化学元素插件'
 	AUTHOR = 'BR'
-	VERSION = '1.0'
+	VERSION = '1.1'
 	DESCRIPTION = '食我方块达人门捷列夫'
 	MANUAL = <<MANUAL.strip!
 化学元素 <元素名|元素序号>
@@ -15,7 +15,7 @@ MANUAL
 
 	COMMAND_PATTERN = /^化学元素\s*(?<element>.+)/
 
-	FILE_DATA = file_path __FILE__, 'pluginElement.yaml'
+	FILE_DATA = file_path __FILE__, 'pluginElement.data'
 
 	def on_load
 		data = YAML.load_file(FILE_DATA)

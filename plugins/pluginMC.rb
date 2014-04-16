@@ -4,7 +4,7 @@
 class PluginMC < PluginNicknameResponserBase
 	NAME = 'MC插件'
 	AUTHOR = 'BR'
-	VERSION = '1.5'
+	VERSION = '1.6'
 	DESCRIPTION = 'MC合成表查询'
 	MANUAL = <<MANUAL.strip
 == 合成表查询 ==
@@ -12,7 +12,7 @@ MC 合成 <物品>（用逗号(,，)分割）
 MANUAL
 	PRIORITY = 0
 
-	CONST_数据文件 = file_path __FILE__, 'pluginMC.yaml'
+	CONST_数据文件 = file_path __FILE__, 'pluginMC.data'
 
 	# COMMAND_PATTERN = /^MC\s*(?<command>.+)/i
 	# RECIPE_PATTERN = /^合成\s*(?<item_names>.+)/i

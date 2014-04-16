@@ -308,7 +308,7 @@ LOG
 			file << image_data
 		end
 		puts "验证码已保存到 #{@captcha_file}, 请输入验证码："
-		`start #{@captcha_file}`
+		# `start #{@captcha_file}`
 		gets.strip.upcase
 	end
 end

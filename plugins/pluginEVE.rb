@@ -14,7 +14,7 @@ require 'rexml/document'
 class PluginEVE < PluginNicknameResponserBase
 	NAME = 'EVE插件'
 	AUTHOR = 'BR'
-	VERSION = '1.4'
+	VERSION = '1.5'
 	DESCRIPTION = '我们的征途的星辰大海'
 	MANUAL = <<MANUAL.strip
 == 吉他价格查询 ==
@@ -23,7 +23,7 @@ EVE 基础矿物
 MANUAL
 	PRIORITY = 0
 
-	CONFIG_FILE = file_path __FILE__, 'pluginEVE.yaml'
+	CONFIG_FILE = file_path __FILE__, 'pluginEVE.data'
 	
 	COMMAND_PATTERN = /^EVE\s*(?<command>.+)/i
 	MARKET_PATTERN  = /^市场\s*(?<item_names>.+)/

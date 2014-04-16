@@ -7,7 +7,7 @@ require 'yaml'
 class PluginCore < PluginNicknameResponserBase
 	NAME = '核心插件'
 	AUTHOR = 'BR'
-	VERSION = '1.13'
+	VERSION = '1.14'
 	DESCRIPTION = 'QQBot核心'
 	MANUAL = <<MANUAL.strip
 ==> 系统插件 <==
@@ -110,6 +110,7 @@ SQL
 			true
 		end
 	end
+
 =begin
 	STATUS_ONLINE  = 'online'
 	STATUS_OFFLINE = 'offline'
@@ -139,6 +140,7 @@ SQL
 		true
 	end
 =end
+
 	COMMAND_LIST_MASTERS         = '权限狗列表'
 	COMMAND_LIST_PLUGINS         = '插件列表'
 	COMMAND_LIST_PLUGIN_PRIORITY = '插件优先级'
@@ -182,9 +184,9 @@ RESPONSE
 
 	STRING_EMPTY = '空'
 
-	MASTERS = 'BR'
+	#MASTERS = 'BR'
 
-	FILE_FILTER_LIST = file_path __FILE__, 'pluginCore.yaml'
+	FILE_FILTER_LIST = file_path __FILE__, 'pluginCore.config'
 
 	def load_filter_list
 		@filter_list = YAML.load_file(FILE_FILTER_LIST)
@@ -199,8 +201,8 @@ RESPONSE
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		# super # FOR DEBUG
 		case message
-		when COMMAND_LIST_MASTERS
-			MASTERS
+		#when COMMAND_LIST_MASTERS
+		#	MASTERS
 		when COMMAND_LIST_PLUGINS
 			header = "已启用插件：\n"
 			body = ''

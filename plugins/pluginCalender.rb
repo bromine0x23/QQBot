@@ -8,7 +8,7 @@ require 'uri'
 class PluginCalender < PluginNicknameResponserBase
 	NAME = '黄历插件'
 	AUTHOR = 'BR'
-	VERSION = '1.11'
+	VERSION = '1.13'
 	DESCRIPTION = '今日不宜：玩弄AI'
 	MANUAL = <<MANUAL.strip
 我的运势
@@ -62,113 +62,171 @@ MANUAL
 		0x00A5B, 0x60A57, 0x0052B, 0x00A93, 0x40E95
 	]
 
-	COMMAND_FORTUNE    = '我的运势'
-	COMMAND_CALENDER   = '今日黄历'
-	COMMAND_BIRTHDAY   = '有谁生日'
-	COMMAND_DICE       = '掷骰子'
-	COMMAND_TRUE_FALSE = /^(?<WHO>.??)(?<ACT>.+)(?<NEG>[不没])\k<ACT>(?<ETC>.*)([呢]?)([?？]?)$/
-	COMMAND_SELECT     = /^(?<SELECT1>.+)还是(?<SELECT2>.+?)([呢]?)([?？]?)$/
+	COMMAND_FORTUNE    = /^我的运势$/
+	COMMAND_CALENDER   = /^今日黄历$/
+=begin
+/^(?<date>
+	(?<month>0?[13578]|1[02])月(?<day>0?[1-9]|[12][0-9]|3[01])[日号]|
+	(?<month>0?[469]|11)月(?<day>0?[1-9]|[12][0-9]|30)[日号]|
+	(?<month>0?2)月(?<day>0?[1-9]|[12][0-9])[日号]|
+	(?<month>0?[13578]|1[02])[-.\/](?<day>0?[1-9]|[12][0-9]|3[01])|
+	(?<month>0?[469]|11)[-.\/](?<day>0?[1-9]|[12][0-9]|30)|
+	(?<month>0?2)[-.\/](?<day>0?[1-9]|[12][0-9])|
+	(?<month>[一三五七八]|十二?)月(?<day>[一二三四五六七八九]|二?十[一二三四五六七八九]?|三十一?)[日号]|
+	(?<month>[四六九]|十一)月(?<day>[一二三四五六七八九]|二?十[一二三四五六七八九]?|三十)[日号]|
+	(?<month>二)月(?<day>[一二三四五六七八九]|二?十[一二三四五六七八九]?)[日号]
+)?(有谁)?生日/x
+=end
+	COMMAND_BIRTHDAY   = /^(?<date>(?<month>0?[13578]|1[02])月(?<day>0?[1-9]|[12][0-9]|3[01])[日号]|(?<month>0?[469]|11)月(?<day>0?[1-9]|[12][0-9]|30)[日号]|(?<month>0?2)月(?<day>0?[1-9]|[12][0-9])[日号]|(?<month>0?[13578]|1[02])[-.\/](?<day>0?[1-9]|[12][0-9]|3[01])|(?<month>0?[469]|11)[-.\/](?<day>0?[1-9]|[12][0-9]|30)|(?<month>0?2)[-.\/](?<day>0?[1-9]|[12][0-9])|(?<month>[一三五七八]|十二?)月(?<day>[一二三四五六七八九]|二?十[一二三四五六七八九]?|三十一?)[日号]|(?<month>[四六九]|十一)月(?<day>[一二三四五六七八九]|二?十[一二三四五六七八九]?|三十)[日号]|(?<month>二)月(?<day>[一二三四五六七八九]|二?十[一二三四五六七八九]?)[日号])?(有谁)?生日/x
+	COMMAND_DICE       = /^掷骰子$/
+	COMMAND_TRUE_FALSE = /^(?<WHO>\S*?)(?<ACT>\S+)(?<NEG>[不没])\k<ACT>(?<ETC>\S*)([呢]?)([?？]?)$/
+	COMMAND_SELECT     = /^(?<SELECT1>\S+)还是(?<SELECT2>\S+?)([呢]?)([?？]?)$/
+	COMMAND_LOTTERY    = /^双色球$/
 
 	STRING_I = '我'
 	STRING_YOU = '你'
 
 	JSON_KEY_RESULT = 'result'
-	JSON_KEY_NAME = 'name'
+	JSON_KEY_NAME   = 'name'
 	JSON_KEY_ORIGIN = 'origin'
 
-	CONFIG_FILE = file_path __FILE__, 'pluginCalender.config'
-
 	def on_load
-		on_load_config
-	end
-
-	def on_load_config
-		# super # FOR DEBUG
-		config = YAML.load_file CONFIG_FILE
-		@things = config[:things]
-		@responces = config[:responces]
-		@birthday = config[:birthday]
+		super
 	end
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		# super # FOR DEBUG
-		case message
-		when COMMAND_FORTUNE
-			time = Time.now
-			response = get_date_string(time)
-			response << get_lunar_date_string(time)
-			level = random(get_seed(time) * sender_qq, 6) % 100 # 迷之伪随机6
-			response << "#{sender_nickname} 的运势指数：#{STR_FORTUNE_LEVELS[level / 5]}(#{level})"
-		when COMMAND_CALENDER
-			time = Time.now
-			seed = get_seed(time)
-			response = get_date_string(time)
-			response << get_lunar_date_string(time)
+		function_fortune(   sender_qq, sender_nickname, message, time) ||
+		function_calender(  sender_qq, sender_nickname, message, time) ||
+		function_dice(      sender_qq, sender_nickname, message, time) ||
+		function_birthday(  sender_qq, sender_nickname, message, time) ||
+		function_true_false(sender_qq, sender_nickname, message, time) ||
+		function_select(    sender_qq, sender_nickname, message, time) ||
+		function_lottery(   sender_qq, sender_nickname, message, time)
+	end
+
+	def function_fortune(sender_qq, sender_nickname, command, time)
+		if COMMAND_FORTUNE =~ command
+			date = Time.at(time)
+			level = random(get_seed(date) * sender_qq, 6) % 100 # 迷之伪随机6
+			"#{get_date_string(date)}#{get_lunar_date_string(date)}#{sender_nickname} 的运势指数：#{STR_FORTUNE_LEVELS[level / 5]}(#{level})"
+		end
+	end
+
+	def function_calender(_, _, command, time)
+		if COMMAND_CALENDER =~ command
+			date = Time.at(time)
+			seed = get_seed(date)
+			response = get_date_string(date) << get_lunar_date_string(date)
 			@tmp_things = @things.clone
 			response << "宜：\n"
-			good_things(seed).each { |thing| response << "#{thing[:name]}:#{thing[:good]}\n" }
+			good_things(seed).each { |thing| response << "#{thing[:thing]}：#{thing[:good]}\n" }
 			response << "忌：\n"
-			bad_things(seed).each { |thing| response << "#{thing[:name]}:#{thing[:bad]}\n" }
+			bad_things(seed).each { |thing| response << "#{thing[:thing]}：#{thing[:bad]}\n" }
 			response
-		when COMMAND_BIRTHDAY
-			json_data = JSON.parse(Net::HTTP.get(URI('http://shiningco.sinaapp.com/api/birthday')))
-			result = json_data[JSON_KEY_RESULT]
+		end
+	end
+
+	def function_dice(sender_qq, _, command, time)
+		if COMMAND_DICE =~ command
+			"#{bot_name} 掷出了 #{random(get_seed(time) | time.sec | sender_qq, 5) % 6 + 1}" # 迷之伪随机5
+		end
+	end
+
+	def function_birthday(_, _, command, time)
+		if COMMAND_BIRTHDAY =~ command
+			if $~[:date]
+				specify_date = true
+				month = try_convert_to_integer($~[:month])
+				day   = try_convert_to_integer($~[:day])
+				result = JSON.parse(Net::HTTP.get(URI("http://shiningco.sinaapp.com/api/birthday?day=#{month}/#{day}")))[JSON_KEY_RESULT]
+			else
+				specify_date = false
+				date = Time.at(time)
+				month = date.month
+				day = date.day
+				result = JSON.parse(Net::HTTP.get(URI('http://shiningco.sinaapp.com/api/birthday')))[JSON_KEY_RESULT]
+			end
+
 			if result
-				response = get_date_string(time)
-				response << get_lunar_date_string(time)
-				response << "今天生日的有：\n"
+				response = specify_date ? "#{month}月#{day}日 生日：\n" : "今日（#{month}月#{day}日）生日：\n"
 				result.sample(@birthday[:display_line]).each do |data|
 					response << "#{data[JSON_KEY_NAME]}（#{data[JSON_KEY_ORIGIN]}）\n"
 				end
 				response
 			else
-				@responces[:nobody].sample
-			end
-		when COMMAND_DICE
-			time = Time.now
-			"#{bot_name} 掷出了 #{random(get_seed(time) | time.sec | sender_qq, 5) % 6 + 1}" # 迷之伪随机5
-		else
-			if COMMAND_TRUE_FALSE =~ message
-
-				who = $~[:WHO]
-				act = $~[:ACT]
-				neg = $~[:NEG]
-				etc = $~[:ETC]
-
-				if who == STRING_YOU
-					@responces[:fuck].sample
-				elsif who  != ''
-					if who == STRING_I
-						if random(get_seed(Time.now) * (act.sum * etc.sum) | sender_qq, 3) % 2 == 0 # 迷之伪随机3
-							"#{act}#{etc}！"
-						else
-							"#{neg}#{act}#{etc}……"
-						end
-					else
-						if random(get_seed(Time.now) * (who.sum  * act.sum * etc.sum), 3) % 2 == 0 # 迷之伪随机3
-							"#{who}#{act}#{etc}！"
-						else
-							"#{who}#{neg}#{act}#{etc}……"
-						end
-					end
-				else
-					@responces[:who].sample
-				end
-			elsif COMMAND_SELECT =~ message
-				select1 = $~[:SELECT1]
-				select2 = $~[:SELECT2]
-
-				if select1 == select2
-					@responces[:same].sample
-				else
-					if random(get_seed(Time.now) * (select1.sum * select2.sum), 2).odd?
-						select1
-					else
-						select2
-					end
-				end
+				specify_date ? "#{month}月#{day}日 #{@responses[:nobody_birthday].sample}" : "今日（#{month}月#{day}日）#{@responses[:nobody_birthday].sample}"
 			end
 		end
+	end
+
+	def function_true_false(sender_qq, _, command, time)
+		if COMMAND_TRUE_FALSE =~ command
+			date = Time.at(time)
+			who = $~[:WHO]
+			act = $~[:ACT]
+			neg = $~[:NEG]
+			etc = $~[:ETC]
+			if who == STRING_YOU
+				@responses[:fuck].sample
+			elsif who != ''
+				if who == STRING_I
+					random(get_seed(date) * (act.sum * etc.sum) | sender_qq, 3).odd? ? "#{act}#{etc}！" : "#{neg}#{act}#{etc}……" # 迷之伪随机3
+				else
+					random(get_seed(date) * (who.sum * act.sum * etc.sum), 3).odd? ? "#{who}#{act}#{etc}！" : "#{who}#{neg}#{act}#{etc}……" # 迷之伪随机3
+				end
+			else
+				@responses[:who].sample
+			end
+		end
+	end
+
+	def function_select(_, _, command, time)
+		if COMMAND_SELECT =~ command
+			date = Time.at(time)
+
+			select1 = $~[:SELECT1]
+			select2 = $~[:SELECT2]
+
+			select1, select2 = select2, select1 if select1.sum > select2.sum
+
+			if select1 == select2
+				@responses[:same].sample
+			else
+				random(get_seed(date) * (select1.sum * select2.sum), 2).odd? ? select1 : select2 # 迷之伪随机2
+			end
+		end
+	end
+
+	def function_lottery(sender_qq, _, command, time)
+		if command =~ COMMAND_LOTTERY
+			date = Time.at(time)
+			seed = get_seed(date) | sender_qq
+			<<RESPONSE
+红复：#{Array.new(6) { |i| '%02d' % (random(seed, i) % 33 + 1) }.join(' ')}
+蓝单：#{random(seed, 6) % 16 + 1}
+RESPONSE
+		end
+	end
+
+	CHINESE_DIGIT_TO_ARAB_DIGIT = {
+		'一' => 1,
+		'二' => 2,
+		'三' => 3,
+		'四' => 4,
+		'五' => 5,
+		'六' => 6,
+		'七' => 7,
+		'八' => 8,
+		'九' => 9,
+		'十' => 10,
+	}
+
+	def try_convert_to_integer(string)
+		integer = string.to_i
+		return integer if integer != 0
+		string.each_char { |chinese_digit| (chinese_digit == '十') ? integer *= 10 : integer += CHINESE_DIGIT_TO_ARAB_DIGIT[chinese_digit] }
+		integer == 0 ? 10 : integer
 	end
 
 	# 迷之伪随机
@@ -235,7 +293,7 @@ DATE
 	def good_things(seed)
 		good_things = []
 		sg = random(seed, 8) % 100 # 迷之伪随机8
-		(random(seed, 9) % 3 + 1).times do # 迷之伪随机9
+		(random(seed, 9) % (@max_good - @min_good) + @min_good).times do # 迷之伪随机9
 			good_things << @tmp_things.delete_at((sg * 0.01 * @tmp_things.size).to_i)
 
 		end
@@ -246,7 +304,7 @@ DATE
 	def bad_things(seed)
 		bad_things = []
 		sb = random(seed, 4) % 100 # 迷之伪随机4
-		(random(seed, 7) % 3 + 1).times do # 迷之伪随机7
+		(random(seed, 7) % (@max_bad - @min_bad) + @min_bad).times do # 迷之伪随机7
 			bad_things << @tmp_things.delete_at((sb * 0.01 * @tmp_things.size).to_i)
 		end
 		bad_things

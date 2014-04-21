@@ -6,7 +6,7 @@ require 'yaml'
 class PluginElement < PluginNicknameResponserBase
 	NAME = '化学元素插件'
 	AUTHOR = 'BR'
-	VERSION = '1.4'
+	VERSION = '1.5'
 	DESCRIPTION = '食我方块达人门捷列夫'
 	MANUAL = <<MANUAL.strip!
 [化学]元素 <元素名|元素序号>
@@ -20,7 +20,7 @@ MANUAL
 		string << element[:中文名] << '，' if element[:中文名]
 		string << element[:英文名] << "）\n"
 		string << "第#{element[:周期]}周期 #{element[:区]}区 #{element[:族]}族\n"
-		string << "相对原子质量：#{element[:相对原子质量]}"
+		string << "相对原子质量：#{element[:相对原子质量]}\n"
 		string << "室温状态：#{element[:室温状态]}\n"
 		string << "熔点：#{element[:摄氏熔点]}℃（#{element[:开氏熔点]}Ｋ）\n"
 		string << (element[:是否升华] ? "沸点：升华\n" : "沸点：#{element[:摄氏沸点]}℃（#{element[:开氏沸点]}Ｋ）\n")

@@ -12,7 +12,7 @@ require 'uri'
 class PluginTranslater < PluginNicknameResponserBase
 	NAME = '翻译插件'
 	AUTHOR = 'BR'
-	VERSION = '1.7'
+	VERSION = '1.8'
 	DESCRIPTION = '妈妈再也不用担心我的外语了！'
 	MANUAL = <<MANUAL.strip
 <源语言>译<目标语言> <翻译内容>
@@ -56,28 +56,28 @@ MANUAL
 	}
 
 	HASH_标识符_TO_缩写 = {
-		'zh' => '汉',
-		'en' => '英',
-		'jp' => '日',
-		'kor' => '韩',
-		'fra' => '法',
-		'th' => '泰',
-		'ru' => '俄',
-		'spa' => '西',
-		'pt' => '葡',
-		'ara' => '阿',
-		'yue' => '粤',
-		'wyw' => '文言',
+		'zh' => '中文',
+		'en' => '英语',
+		'jp' => '日语',
+		'kor' => '韩语',
+		'fra' => '法语',
+		'th' => '泰语',
+		'ru' => '俄语',
+		'spa' => '西班牙语',
+		'pt' => '葡萄牙语',
+		'ara' => '阿拉伯语',
+		'yue' => '粤语',
+		'wyw' => '文言文',
 	}
 
 	COMMAND_PATTERN = /^(?<翻译方向>#{STRING_翻译}|(?<源语言>.)译(?<目标语言>.))\s*(?<待翻译内容>.+)/
 
-	JSON_KEY_ERROR_CODE = 'error_code'
-	JSON_KEY_ERROR_MSG = 'error_msg'
-	JSON_KEY_FROM = 'from'
-	JSON_KEY_TO = 'to'
+	JSON_KEY_ERROR_CODE   = 'error_code'
+	JSON_KEY_ERROR_MSG    = 'error_msg'
+	JSON_KEY_FROM         = 'from'
+	JSON_KEY_TO           = 'to'
 	JSON_KEY_TRANS_RESULT = 'trans_result'
-	JSON_KEY_DST = 'dst'
+	JSON_KEY_DST          = 'dst'
 
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		# super # FOR DEBUG
@@ -101,10 +101,10 @@ MANUAL
 			when STRING_52003
 				'翻译错误：未授权的用户'
 			else
-				<<responce
-#{HASH_标识符_TO_缩写[json_data[JSON_KEY_FROM]]}译#{HASH_标识符_TO_缩写[json_data[JSON_KEY_TO]]}：
+				<<RESPONSE
+#{HASH_标识符_TO_缩写[json_data[JSON_KEY_FROM]]} → #{HASH_标识符_TO_缩写[json_data[JSON_KEY_TO]]}：
 #{json_data[JSON_KEY_TRANS_RESULT].map {|result| result[JSON_KEY_DST]}.join("\n")}
-responce
+RESPONSE
 			end
 		end
 	end

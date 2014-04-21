@@ -27,11 +27,9 @@ MANUAL
 	def get_response(uin, sender_qq, sender_nickname, message, time)
 		# super # FOR DEBUG
 		if COMMAND_PATTERN =~ message
-			responce = response_header_with_nickname sender_nickname
-			$~[:item_names].split(SEPARATORS).each do |item_name|
-				responce << @recipe[@alias[item_name]] << "\n"
-			end
-			responce
+			<<RESPONSE
+#{response_header_with_nickname(sender_nickname)}#{$~[:item_names].split(SEPARATORS).map{|item_name| @recipe[@alias[item_name]]}.join("\n")}
+RESPONSE
 		end
 	end
 end

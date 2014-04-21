@@ -1,0 +1,9 @@
+---
+:units:
+  :price: ISK
+:thousand_separator: ','
+:responses:
+  :no_price: 暂无出价
+  :no_item: 不存在物品：%s
+  :no_system: 不存在星系：%s
+  :no_constellation: 不存在星座：%s

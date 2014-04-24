@@ -3,6 +3,7 @@
   :no_permission: 权限不足：%{command}
   :config_reloaded: 配置已重载
   :plugins_reloaded: 插件已重载，共 %{plugin_count} 个插件
+  :plugins_reloaded_failed: 插件重载失败
   :gc_finished: 垃圾回收运行完毕，已执行 %{gc_count} 次
   :debug_started: 调试开始
   :debug_stopped: 调试结束

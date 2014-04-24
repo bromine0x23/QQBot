@@ -4,7 +4,7 @@
   :captcha_file: captcha.jpg
   :qq: '10086' # Q号
   :password: 123456 # 密码
-  :bot_name: QQBot # 机器人昵称
+  :name: QQBot # 机器人昵称
   :masters: !ruby/object:Set # 最高权限管理员
     hash:
       10000: true

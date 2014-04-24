@@ -12,7 +12,7 @@ class PluginBase
 MANUAL
 	PRIORITY = 0
 
-	PLUGIN_DIRECTORY = File.expand_path(File.dirname(__FILE__))
+	PLUGIN_DIRECTORY = 'plugins'
 
 	@@plugins = []
 	@@instance_plugins = []
@@ -30,8 +30,6 @@ MANUAL
 	def initialize(qqbot, logger)
 		@qqbot = qqbot
 		@logger = logger
-		@send_message = @qqbot.method(:send_message)
-		@send_group_message = @qqbot.method(:send_group_message)
 		on_load
 		log('初始化完毕', Logger::DEBUG) if $-d
 	end
@@ -96,86 +94,9 @@ MANUAL
 		# 桩方法
 	end
 
-	def on_enter_loop
-		# 桩方法
-	end
-
-	def on_exit_loop
-		# 桩方法
-	end
-
-	# @param [Hash] value
-	def on_message(value)
-		log("message #{value}", Logger::DEBUG) if $-d
-		# 桩方法，处理 message 消息
-		nil
-	end
-
-	# @param [Hash] value
-	def on_group_message(value)
-		log("group_message #{value}", Logger::DEBUG) if $-d
-		# 桩方法，处理 group_message 事件
-		nil
-	end
-
-	# @param [Hash] value
-	def on_input_notify(value)
-		log("input_notify #{value}", Logger::DEBUG) if $-d
-		# 桩方法，处理 input_notify 消息
-		true # 暂时忽略
-	end
-
-	# @param [Hash] value
-	def on_buddies_status_change(value)
-		log("buddies_status_change #{value}", Logger::DEBUG) if $-d
-		# 桩方法，处理 buddies_status_change 消息
-		nil
-	end
-
-	# @param [Hash] value
-	def on_sess_message(value)
-		log("sess_message #{value}")
-		# 桩方法，处理 sess_message 消息
-		nil
-	end
-
-	# @param [Hash] value
-	def on_kick_message(value)
-		log("kick_message #{value}")
-		# 桩方法，处理 kick_message 消息
-		true
-	end
-
-	# @param [Hash] value
-	def on_group_web_message(value)
-		log("group_web_message #{value}")
-		# 桩方法，处理 group_web_message 消息
-		true
-	end
-
-	# @param [Hash] value
-	def on_system_message(value)
-		log("system_message #{value}")
-		# 桩方法，处理 system_message 消息
-		true
-	end
-
-	# @param [Hash] value
-	def on_sys_g_msg(value)
-		log("sys_g_msg #{value}")
-		# 桩方法，处理 sys_g_msg 消息
-		true
-	end
-
-	# @param [Hash] value
-	def on_buddylist_change(value)
-		log("buddylist_change #{value}")
-		# 桩方法，处理 buddylist_change 消息
-		true
-	end
-
 	protected
 
+	# @return [QQBot]
 	def qqbot
 		@qqbot
 	end
@@ -199,35 +120,20 @@ MANUAL
 	end
 end
 
+#noinspection RubyUnusedLocalVariable
 class PluginResponderBase < PluginBase
 	NAME = '消息回应插件基类'
 
-	KEY_FROM_UIN = 'from_uin'
-	KEY_SEND_UIN = 'send_uin'
-	KEY_CONTENT  = 'content'
-	KEY_TIME     = 'time'
-
-	# @param [Hash] value
-	def on_message(value)
+	def initialize(qqbot, logger)
 		super
-		sender = qqbot.friend(value[KEY_FROM_UIN])
-		time = Time.at(value[KEY_TIME])
-		deal_message(sender, value[KEY_CONTENT], time)
-	end
-
-	# @param [Hash] value
-	def on_group_message(value)
-		super
-		from = qqbot.group(value[KEY_FROM_UIN])
-		sender = from.member(value[KEY_SEND_UIN])
-		time = Time.at(value[KEY_TIME])
-		deal_group_message(from, sender, value[KEY_CONTENT], time)
+		@send_message = @qqbot.method(:send_message)
+		@send_group_message = @qqbot.method(:send_group_message)
 	end
 
 	# @param [WebQQProtocol::QQFriend] sender
 	# @param [content] content
 	# @param [Time] time
-	def deal_message(sender, content, time)
+	def on_message(sender, content, time)
 		# 桩方法，处理事件响应
 	end
 
@@ -235,7 +141,7 @@ class PluginResponderBase < PluginBase
 	# @param [WebQQProtocol::QQGroupMember] sender
 	# @param [content] content
 	# @param [Time] time
-	def deal_group_message(from, sender, content, time)
+	def on_group_message(from, sender, content, time)
 		# 桩方法，处理群事件响应
 	end
 end
@@ -243,12 +149,24 @@ end
 class PluginNicknameResponderBase < PluginResponderBase
 	NAME = '昵称呼叫型消息回应插件基类'
 
-	def deal_message(sender, content, time)
+	def initialize(qqbot, logger)
+		super
+		@qqbot_name = @qqbot.name
+	end
+
+	# @param [WebQQProtocol::QQFriend] sender
+	# @param [content] content
+	# @param [Time] time
+	def on_message(sender, content, time)
 		response_or_ignore(sender, sender, QQBot.message(content), time, @send_message)
 	end
 
-	def deal_group_message(from, sender, content, time)
-		if /^\s*@?#{bot_name}(?<message>.*)/ =~ QQBot.message(content)
+	# @param [WebQQProtocol::QQGroup] from
+	# @param [WebQQProtocol::QQGroupMember] sender
+	# @param [content] content
+	# @param [Time] time
+	def on_group_message(from, sender, content, time)
+		if /^\s*@?#{qqbot_name}(?<message>.*)/ =~ QQBot.message(content)
 			response_or_ignore(from, sender, $~[:message].strip, time, @send_group_message)
 		end
 	end
@@ -260,7 +178,7 @@ class PluginNicknameResponderBase < PluginResponderBase
 	# @param [Method] call_back
 	def response_or_ignore(from, sender, command, time, call_back)
 		response = get_response(from, sender, command, time)
-		call_back.call(from.uin, response) if response
+		call_back.call(from, response) if response
 	end
 
 	# @param [WebQQProtocol::QQEntity] from
@@ -273,8 +191,8 @@ class PluginNicknameResponderBase < PluginResponderBase
 
 	protected
 
-	def bot_name
-		@qqbot.bot_name
+	def qqbot_name
+		@qqbot_name
 	end
 end
 

@@ -171,7 +171,7 @@ SQL
 	def function_response(_, sender, command, _)
 		result = @db.execute(SQL_SELECT_RESPONSES, command).map!{ |row| row[0] }.sample
 		if result
-			result %  {我: bot_name, 你: sender.name}
+			result %  {我: qqbot_name, 你: sender.name}
 		else
 			#noinspection RubyResolve
 			@responses[:null].sample

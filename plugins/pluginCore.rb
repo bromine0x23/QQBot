@@ -91,7 +91,7 @@ SQL
 		@db.close
 	end
 
-	def deal_message(sender, content, time)
+	def on_message(sender, content, time)
 		@db.transaction do |db|
 			db.execute(SQL_INSERT_MESSAGE, sender.number, sender.name, QQBot.message(content), time.to_i)
 		end
@@ -99,7 +99,7 @@ SQL
 		super
 	end
 
-	def deal_group_message(from, sender, content, time)
+	def on_group_message(from, sender, content, time)
 		@db.transaction do |db|
 			db.execute(SQL_INSERT_GROUP_MESSAGE, from.number, from.name, sender.number, sender.name, QQBot.message(content), time.to_i)
 		end
@@ -138,7 +138,7 @@ SQL
 	def function_list_plugins(from, _, command, _)
 		if COMMAND_LIST_PLUGINS == command
 			header = "已启用插件：\n"
-			body = qqbot.plugins(from.uin).map! { |plugin| "#{plugin.name}[#{plugin.author}<#{plugin.version}>]：#{plugin.description}" }.join("\n")
+			body = qqbot.plugins(from).map! { |plugin| "#{plugin.name}[#{plugin.author}<#{plugin.version}>]：#{plugin.description}" }.join("\n")
 			#noinspection RubyResolve
 			header << (body.empty? ? @responses[:plugin_list_empty] : body)
 		end
@@ -146,13 +146,13 @@ SQL
 
 	def function_list_priorities(from, _, command, _)
 		if COMMAND_LIST_PRIORITIES == command
-			qqbot.plugins(from.uin).map { |plugin| "#{plugin.name} => #{plugin.priority}" }.join("\n")
+			qqbot.plugins(from).map { |plugin| "#{plugin.name} => #{plugin.priority}" }.join("\n")
 		end
 	end
 
 	def function_reload_config(_, sender, command, _)
 		if COMMAND_RELOAD_CONFIG == command
-			if qqbot.master?(sender.number)
+			if qqbot.master?(sender)
 				qqbot.load_config
 				#noinspection RubyResolve
 				@responses[:config_reloaded]
@@ -165,10 +165,14 @@ SQL
 
 	def function_reload_plugins(_, sender, command, _)
 		if COMMAND_RELOAD_PLUGINS == command
-			if qqbot.master?(sender.number)
+			if qqbot.master?(sender)
 				plugin_count = qqbot.reload_plugins
 				#noinspection RubyResolve
-				@responses[:plugins_reloaded] % {plugin_count: plugin_count}
+				if plugin_count > 0
+					@responses[:plugins_reloaded] % {plugin_count: plugin_count}
+				else
+					@responses[:plugins_reloaded_failed]
+				end
 			else
 				#noinspection RubyResolve
 				@responses[:no_permission] % {command: command}
@@ -178,7 +182,7 @@ SQL
 
 	def function_start_gc(_, sender, command, _)
 		if COMMAND_START_GC == command
-			if qqbot.master?(sender.number)
+			if qqbot.master?(sender)
 				GC.start
 				#noinspection RubyResolve
 				@responses[:gc_finished] % {gc_count: GC.count}
@@ -191,7 +195,7 @@ SQL
 
 	def function_start_debug(_, sender, command, _)
 		if COMMAND_START_DEBUG == command
-			if qqbot.master?(sender.number)
+			if qqbot.master?(sender)
 				$-d = true
 				#noinspection RubyResolve
 				@responses[:debug_started]
@@ -204,7 +208,7 @@ SQL
 
 	def function_stop_debug(_, sender, command, _)
 		if COMMAND_STOP_DEBUG == command
-			if qqbot.master?(sender.number)
+			if qqbot.master?(sender)
 				$-d = false
 				#noinspection RubyResolve
 				@responses[:debug_stopped]
@@ -217,7 +221,7 @@ SQL
 
 	def function_display_filter_list(from, sender, command, _)
 		if COMMAND_FILTER_LIST == command
-			if qqbot.administrator?(from.uin, sender.number)
+			if qqbot.master?(sender) or qqbot.group_manager?(from, sender)
 				#noinspection RubyResolve
 				@filter.empty? ? @responses[:filter_list_empty] : @filter.join("\n")
 			else
@@ -229,7 +233,7 @@ SQL
 
 	def function_filter_add(from, sender, command, _)
 		if COMMAND_FILTER_ADD =~ command
-			if qqbot.administrator?(from.uin, sender.number)
+			if qqbot.master?(sender) or qqbot.group_manager?(from, sender)
 				number = $~[:number].to_i
 				@filter << number unless @filter.include? number
 				save_filter_list
@@ -244,7 +248,7 @@ SQL
 
 	def function_filter_remove(from, sender, command, _)
 		if COMMAND_FILTER_REMOVE =~ command
-			if qqbot.administrator?(from.uin, sender.number)
+			if qqbot.master?(sender) or qqbot.group_manager?(from, sender)
 				number = $~[:number].to_i
 				@filter.delete number
 				save_filter_list
@@ -259,44 +263,51 @@ SQL
 
 	def function_plugin_manual(_, _, command, _)
 		if COMMAND_PLUGIN_MANUAL =~ command
-			plugin_name = $~[:plugin_name]
-			plugin = qqbot.plugin(plugin_name)
+			plugin = qqbot.plugin($~[:plugin_name])
 			if plugin
 				#noinspection RubyResolve
-				@responses[:plugin_help] % {plugin_name: plugin_name, plugin_manual: plugin.manual}
+				@responses[:plugin_help] % {plugin_name: plugin.name, plugin_manual: plugin.manual}
 			else
 				#noinspection RubyResolve
-				@responses[:unknown_plugin] % {plugin_name: plugin_name}
+				@responses[:unknown_plugin] % {plugin_name: plugin.name}
 			end
 		end
 	end
 
 	def function_plugin_enable(_, _, command, _)
 		if COMMAND_PLUGIN_ENABLE =~ command
-			plugin_name = $~[:plugin_name]
-			plugin = qqbot.plugin(plugin_name)
-			if plugin
-				qqbot.enable_plugin(from.uin, sender.number, plugin)
-				#noinspection RubyResolve
-				@responses[:plugin_enabled] % {plugin_name: plugin_name}
+			if qqbot.master?(sender) or qqbot.group_manager?(from, sender)
+				plugin = qqbot.plugin($~[:plugin_name])
+				if plugin
+					qqbot.enable_plugin(from, sender, plugin)
+					#noinspection RubyResolve
+					@responses[:plugin_enabled] % {plugin_name: plugin.name}
+				else
+					#noinspection RubyResolve
+					@responses[:unknown_plugin] % {plugin_name: plugin.name}
+				end
 			else
 				#noinspection RubyResolve
-				@responses[:unknown_plugin] % {plugin_name: plugin_name}
+				@responses[:no_permission] % {command: command}
 			end
 		end
 	end
 
 	def function_plugin_disable(_, _, command, _)
 		if COMMAND_PLUGIN_DISABLE =~ command
-			plugin_name = $~[:plugin_name]
-			plugin = qqbot.plugin(plugin_name)
-			if plugin
-				qqbot.disable_plugin(from.uin, sender.number, plugin)
-				#noinspection RubyResolve
-				@responses[:plugin_disabled] % {plugin_name: plugin_name}
+			if qqbot.master?(sender) or qqbot.group_manager?(from, sender)
+				plugin = qqbot.plugin($~[:plugin_name])
+				if plugin
+					qqbot.disable_plugin(from, sender, plugin)
+					#noinspection RubyResolve
+					@responses[:plugin_disabled] % {plugin_name: plugin.name}
+				else
+					#noinspection RubyResolve
+					@responses[:unknown_plugin] % {plugin_name: plugin.name}
+				end
 			else
 				#noinspection RubyResolve
-				@responses[:unknown_plugin] % {plugin_name: plugin_name}
+				@responses[:no_permission] % {command: command}
 			end
 		end
 	end

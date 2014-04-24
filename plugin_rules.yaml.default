@@ -2,5 +2,5 @@
 12345:
   :forbidden_list: !ruby/object:Set
     hash: {}
-  :administrators: !ruby/object:Set
+  :group_managers: !ruby/object:Set
     hash: {}

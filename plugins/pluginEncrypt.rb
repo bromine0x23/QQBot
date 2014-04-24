@@ -7,7 +7,7 @@ require 'digest'
 class PluginEncrypt < PluginNicknameResponderCombineFunctionBase
 	NAME = '加密插件'
 	AUTHOR = 'BR'
-	VERSION = '1.0'
+	VERSION = '1.1'
 	DESCRIPTION = '字符串加密（哈希）'
 	MANUAL = <<MANUAL.strip
 加密 <加密方法> <源串>
@@ -17,17 +17,15 @@ SHA1 SHA256 SHA384 SHA512
 MANUAL
 	PRIORITY = 0
 
-	COMMAND_HEADER = '加密'
-
-	COMMAND_BUDDHA_ENCODE = /^佛曰\s*(?<src>.+)/m
+	COMMAND_BUDDHA_ENCODE = /^问佛\s*(?<src>.+)/m
 	COMMAND_BUDDHA_DECODE = /^参悟\s*(?<src>.+)/m
-	COMMAND_BASE64_ENCODE = /^编码BASE64\s*(?<src>.+)/mi
-	COMMAND_BASE64_DECODE = /^解码BASE64\s*(?<src>.+)/mi
-	COMMAND_MD5    = /^MD5\s*(?<src>.+)/mi
-	COMMAND_SHA1   = /^SHA1\s*(?<src>.+)/mi
-	COMMAND_SHA256 = /^SHA256\s*(?<src>.+)/mi
-	COMMAND_SHA384 = /^SHA384\s*(?<src>.+)/mi
-	COMMAND_SHA512 = /^SHA512\s*(?<src>.+)/mi
+	COMMAND_BASE64_ENCODE = /^编码\s*BASE64\s*(?<src>.+)/mi
+	COMMAND_BASE64_DECODE = /^解码\s*BASE64\s*(?<src>.+)/mi
+	COMMAND_MD5    = /^计算\s*MD5\s*(?<src>.+)/mi
+	COMMAND_SHA1   = /^计算\s*SHA1\s*(?<src>.+)/mi
+	COMMAND_SHA256 = /^计算\s*SHA256\s*(?<src>.+)/mi
+	COMMAND_SHA384 = /^计算\s*SHA384\s*(?<src>.+)/mi
+	COMMAND_SHA512 = /^计算\s*SHA512\s*(?<src>.+)/mi
 
 	URI_BUDDHA = URI('http://keyfc.laputachen.com/bbs/tools/tudou.aspx')
 

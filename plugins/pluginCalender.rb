@@ -139,7 +139,7 @@ MANUAL
 
 	def function_dice(_, sender, command, time)
 		if COMMAND_DICE =~ command
-			"#{bot_name} 掷出了 #{random(get_seed(time) | time.sec | sender.number, 5) % 6 + 1}" # 迷之伪随机5
+			"#{qqbot_name} 掷出了 #{random(get_seed(time) | time.sec | sender.number, 5) % 6 + 1}" # 迷之伪随机5
 		end
 	end
 

@@ -2,169 +2,21 @@
 # -*- coding: utf-8 -*-
 
 require_relative 'webqq'
+require_relative 'plugin_manager'
 require 'yaml'
-require 'set'
-
-# $DEBUG = true
 
 #noinspection RubyTooManyInstanceVariablesInspection
 class QQBot
 	FILE_CONFIG = 'config.yaml'
-	FILE_PLUGIN_RULES = 'plugin_rules.yaml'
-	LOAD_PLUGINS_PATH = './plugins/plugin*.rb'
 
-	class PluginAdministrator
-		SOURCE_PLUGIN = './plugins/plugin.rb'
-		PATH_PLUGINS = './plugins/plugin?*.rb'
-		FILE_RULES = 'plugin_rules.yaml'
-
-		attr_reader :plugins
-
-		def initialize(qqbot, logger)
-			@qqbot  = qqbot
-			@logger = logger
-			@plugins = []
-		end
-
-		#noinspection RubyResolve
-		def load_plugins
-			load SOURCE_PLUGIN
-			Dir.glob(PATH_PLUGINS).sort.each { |file_name| load file_name }
-			@plugins = []
-			PluginBase.instance_plugins.each { |plugin_class|
-				begin
-					@plugins << plugin_class.new(@qqbot, @logger)
-				rescue Exception => ex
-					log(<<LOG, Logger::ERROR)
-载入插件 #{plugin_class::NAME} 时发生异常：#{ex}
-调用栈：
-#{ex.backtrace.join("\n")}
-LOG
-				end
-			}
-			@plugins.sort_by! { |plugin| -plugin.priority }
-			load_rules
-			log('插件载入完毕', Logger::DEBUG) if $-d
-			@plugins.size
-		end
-
-		def unload_plugins
-			save_rules
-			until @plugins.empty?
-				begin
-					plugin = @plugins.pop
-					plugin.on_unload
-				rescue Exception => ex
-					log(<<LOG, Logger::ERROR)
-卸载插件 #{plugin.name} 时发生异常：#{ex}
-调用栈：
-#{ex.backtrace.join("\n")}
-LOG
-				end
-			end
-			PluginBase.plugins.each do |plugin|
-				Object.send(:remove_const, plugin.name.to_sym)
-			end
-			Object.send(:remove_const, :PluginBase)
-			log('插件卸载完毕', Logger::DEBUG) if $-d
-			true
-		end
-
-		def reload_plugins
-			unload_plugins
-			load_plugins
-			log('插件重载完毕', Logger::DEBUG) if $-d
-			@plugins.size
-		end
-
-		def load_rules
-			@rules = YAML.load_file FILE_RULES
-			@rules.default_proc = proc do |hash, key|
-				hash[key] = {
-					forbidden_list: Set.new,
-					administrators: Set.new
-				}
-			end
-		end
-
-		def save_rules
-			File.open(FILE_RULES, 'w') do |file|
-				file << YAML.dump(@rules)
-			end
-		end
-
-		def administrator?(group_number, qq_number)
-			@qqbot.master?(qq_number) or @rules[group_number][:administrators].include?(qq_number)
-		end
-
-		def enable_plugin(uin, qq_number, plugin)
-			entity = @qqbot.entity(uin)
-			if entity.is_a? WebQQProtocol::QQGroup
-				group_number = entity.number
-				@rules[group_number][:forbidden_list].delete(plugin.class.name) if administrator?(group_number, qq_number)
-			end
-			save_rules
-		end
-
-		def disable_plugin(uin, qq_number, plugin)
-			entity = @qqbot.entity(uin)
-			if entity.is_a? WebQQProtocol::QQGroup
-				group_number = entity.number
-				@rules[group_number][:forbidden_list].add(plugin.class.name) if administrator?(group_number, qq_number)
-			end
-			save_rules
-		end
-
-		def forbidden?(plugin_name, group_number)
-			@rules[group_number][:forbidden_list].include? plugin_name
-		end
-
-		def filtered_plugins(group_number)
-			@plugins.select do |plugin|
-				not forbidden?(plugin.class.name, group_number)
-			end
-		end
-
-		def on_event(data)
-			poll_type = data[KEY_POLL_TYPE]
-			value     = data[KEY_VALUE]
-			event     = :"on_#{poll_type}"
-			from_uin  = value[KEY_FROM_UIN]
-			from_entity = @qqbot.entity(from_uin)
-
-			@plugins.each do |plugin|
-				next if from_entity.is_a?(WebQQProtocol::QQGroup) and forbidden?(plugin.class.name, from_entity.number)
-				begin
-					break if plugin.send(event, value)
-				rescue Exception => ex
-					log(<<LOG, Logger::ERROR)
-执行插件 #{plugin.name} 时发生异常：#{ex}
-调用栈：
-#{ex.backtrace.join("\n")}
-LOG
-				end
-			end
-		end
-
-		private
-
-		def log(message, level = Logger::INFO)
-			@logger.log(level, message, self.class.name)
-		end
-	end
-
-	KEY_POLL_TYPE = 'poll_type'
-	KEY_VALUE = 'value'
-	KEY_FROM_UIN = 'from_uin'
-
-	attr_reader :bot_name
+	attr_reader :name
 	attr_reader :masters
-	attr_reader :plugin_administrator
+	attr_reader :plugin_manager
 
 	def initialize
 		load_config
 		init_logger
-		@plugin_administrator = PluginAdministrator.new(self, @logger)
+		@plugin_manager = PluginManager.new(self, @logger)
 	end
 
 	def load_config
@@ -174,7 +26,7 @@ LOG
 		@captcha_file = common_config[:captcha_file] || 'captcha.jpg'
 		@qq, @password = common_config[:qq], common_config[:password]
 		raise Exception.new('未设置QQ号或密码') unless @qq and @password
-		@bot_name = common_config[:bot_name]
+		@name = common_config[:name]
 		@masters = common_config[:masters]
 		@font_config = config[:font]
 	end
@@ -205,7 +57,7 @@ LOG
 				datas = @message_receiver.data
 				log("data => #{datas}") if $-d
 				datas.each do |data|
-					@plugin_administrator.on_event(data)
+					@plugin_manager.on_event(data)
 				end
 			end
 		ensure
@@ -222,66 +74,64 @@ LOG
 		unload_plugins
 	end
 
-	def send_message(uin, message, font = {})
-		@message_sender.send_message(uin, message.strip, @font_config.merge(font))
+	def send_message(from, message, font = {})
+		@message_sender.send_message(from.uin, message.strip, @font_config.merge(font))
 	end
 
-	def send_group_message(uin, message, font = {})
-		@message_sender.send_group_message(uin, message.strip, @font_config.merge(font))
+	def send_group_message(from, message, font = {})
+		@message_sender.send_group_message(from.uin, message.strip, @font_config.merge(font))
 	end
 
+	# @return [String]
 	def self.message(content)
-		message = ''
-		content.each do |item|
-			message << item if item.is_a? String
-		end
-		message.strip
+		content.select { |item| item.is_a? String }.join.strip
 	end
 
+	# @return [PluginBase]
 	def plugin(plugin_name)
-		@plugin_administrator.plugins.find{ |plugin| plugin.name == plugin_name }
+		@plugin_manager.plugin(plugin_name)
 	end
 
-	def plugins(uin)
-		entity = entity uin
-		entity.is_a?(WebQQProtocol::QQGroup) ? @plugin_administrator.filtered_plugins(entity.number) : @plugin_administrator.plugins
+	# @param [WebQQProtocol::QQEntity] from
+	def plugins(from)
+		from.is_a?(WebQQProtocol::QQGroup) ? @plugin_manager.filtered_plugins(from) : @plugin_manager.plugins
 	end
 
 	def load_plugins
-		@plugin_administrator.load_plugins
+		@plugin_manager.load_plugins
 	end
 
 	def unload_plugins
-		@plugin_administrator.unload_plugins
+		@plugin_manager.unload_plugins
 	end
 
 	def reload_plugins
-		@plugin_administrator.reload_plugins
+		@plugin_manager.reload_plugins
 	end
 
-	def enable_plugin(uin, qq_number, plugin)
-		@plugin_administrator.enable_plugin(uin, qq_number, plugin)
-		true
+	# @param [WebQQProtocol::QQEntity] from
+	# @param [WebQQProtocol::QQEntity] sender
+	# @param [PluginBase] plugin
+	def enable_plugin(from, sender, plugin)
+		@plugin_manager.enable_plugin(from, sender, plugin) if from.is_a? WebQQProtocol::QQGroup
 	end
 
-	def disable_plugin(uin, qq_number, plugin)
-		@plugin_administrator.disable_plugin(uin, qq_number, plugin)
-		true
+	# @param [WebQQProtocol::QQEntity] from
+	# @param [WebQQProtocol::QQEntity] sender
+	# @param [PluginBase] plugin
+	def disable_plugin(from, sender, plugin)
+		@plugin_manager.disable_plugin(from, sender, plugin) if from.is_a? WebQQProtocol::QQGroup
 	end
 
-	# @return [TrueClass or FalseClass]
-	def forbidden?(plugin_name, uin)
-		entity = entity uin
-		entity.is_a?(WebQQProtocol::QQGroup) and @plugin_administrator.forbidden?(plugin_name, entity.number)
+	# @param [WebQQProtocol::QQGroup] group
+	# @param [WebQQProtocol::QQGroupMember] member
+	def group_manager?(group, member)
+		@masters.group_manager?(group, member) if group.is_a? WebQQProtocol::QQGroup
 	end
 
-	def administrator?(uin, qq_number)
-		entity = entity uin
-		entity.is_a?(WebQQProtocol::QQGroup) and @plugin_administrator.administrator?(entity.number, qq_number) or master?(qq_number)
-	end
-
-	def master?(qq_number)
-		@masters.include? qq_number
+	# @param [WebQQProtocol::QQEntity] sender
+	def master?(sender)
+		@masters.include? sender.number
 	end
 
 	# @return [WebQQProtocol::QQEntity]
@@ -297,11 +147,6 @@ LOG
 	# @return [WebQQProtocol::QQGroup]
 	def group(guin)
 		@client.group(guin)
-	end
-
-	# @return [WebQQProtocol::QQGroupMember]
-	def group_member(guin, uin)
-		group(guin).member(uin)
 	end
 
 	# @return [WebQQProtocol::QQFriend]

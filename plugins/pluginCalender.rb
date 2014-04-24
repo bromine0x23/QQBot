@@ -1,14 +1,13 @@
-#!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
 require 'json'
 require 'net/http'
 require 'uri'
 
-class PluginCalender < PluginNicknameResponserBase
+class PluginCalender < PluginNicknameResponderCombineFunctionBase
 	NAME = '黄历插件'
 	AUTHOR = 'BR'
-	VERSION = '1.13'
+	VERSION = '1.14'
 	DESCRIPTION = '今日不宜：玩弄AI'
 	MANUAL = <<MANUAL.strip
 我的运势
@@ -62,6 +61,19 @@ MANUAL
 		0x00A5B, 0x60A57, 0x0052B, 0x00A93, 0x40E95
 	]
 
+	CHINESE_DIGIT_TO_ARAB_DIGIT = {
+		'一' => 1,
+		'二' => 2,
+		'三' => 3,
+		'四' => 4,
+		'五' => 5,
+		'六' => 6,
+		'七' => 7,
+		'八' => 8,
+		'九' => 9,
+		'十' => 10,
+	}
+
 	COMMAND_FORTUNE    = /^我的运势$/
 	COMMAND_CALENDER   = /^今日黄历$/
 =begin
@@ -77,7 +89,7 @@ MANUAL
 	(?<month>二)月(?<day>[一二三四五六七八九]|二?十[一二三四五六七八九]?)[日号]
 )?(有谁)?生日/x
 =end
-	COMMAND_BIRTHDAY   = /^(?<date>(?<month>0?[13578]|1[02])月(?<day>0?[1-9]|[12][0-9]|3[01])[日号]|(?<month>0?[469]|11)月(?<day>0?[1-9]|[12][0-9]|30)[日号]|(?<month>0?2)月(?<day>0?[1-9]|[12][0-9])[日号]|(?<month>0?[13578]|1[02])[-.\/](?<day>0?[1-9]|[12][0-9]|3[01])|(?<month>0?[469]|11)[-.\/](?<day>0?[1-9]|[12][0-9]|30)|(?<month>0?2)[-.\/](?<day>0?[1-9]|[12][0-9])|(?<month>[一三五七八]|十二?)月(?<day>[一二三四五六七八九]|二?十[一二三四五六七八九]?|三十一?)[日号]|(?<month>[四六九]|十一)月(?<day>[一二三四五六七八九]|二?十[一二三四五六七八九]?|三十)[日号]|(?<month>二)月(?<day>[一二三四五六七八九]|二?十[一二三四五六七八九]?)[日号])?(有谁)?生日/x
+	COMMAND_BIRTHDAY   = /^(?<date>(?<month>0?[13578]|1[02])月(?<day>0?[1-9]|[12][0-9]|3[01])[日号]|(?<month>0?[469]|11)月(?<day>0?[1-9]|[12][0-9]|30)[日号]|(?<month>0?2)月(?<day>0?[1-9]|[12][0-9])[日号]|(?<month>0?[13578]|1[02])[-.\/](?<day>0?[1-9]|[12][0-9]|3[01])|(?<month>0?[469]|11)[-.\/](?<day>0?[1-9]|[12][0-9]|30)|(?<month>0?2)[-.\/](?<day>0?[1-9]|[12][0-9])|(?<month>[一三五七八]|十二?)月(?<day>[一二三四五六七八九]|二?十[一二三四五六七八九]?|三十一?)[日号]|(?<month>[四六九]|十一)月(?<day>[一二三四五六七八九]|二?十[一二三四五六七八九]?|三十)[日号]|(?<month>二)月(?<day>[一二三四五六七八九]|二?十[一二三四五六七八九]?)[日号])?(有谁)?生日/
 	COMMAND_DICE       = /^掷骰子$/
 	COMMAND_TRUE_FALSE = /^(?<WHO>\S*?)(?<ACT>\S+)(?<NEG>[不没])\k<ACT>(?<ETC>\S*)([呢]?)([?？]?)$/
 	COMMAND_SELECT     = /^(?<SELECT1>\S+)还是(?<SELECT2>\S+?)([呢]?)([?？]?)$/
@@ -94,30 +106,28 @@ MANUAL
 		super
 	end
 
-	def get_response(uin, sender_qq, sender_nickname, message, time)
-		# super # FOR DEBUG
-		function_fortune(   sender_qq, sender_nickname, message, time) ||
-		function_calender(  sender_qq, sender_nickname, message, time) ||
-		function_dice(      sender_qq, sender_nickname, message, time) ||
-		function_birthday(  sender_qq, sender_nickname, message, time) ||
-		function_true_false(sender_qq, sender_nickname, message, time) ||
-		function_select(    sender_qq, sender_nickname, message, time) ||
-		function_lottery(   sender_qq, sender_nickname, message, time)
-	end
+	FUNCTIONS = [
+		:function_fortune,
+		:function_calender,
+		:function_dice,
+		:function_birthday,
+		:function_true_false,
+		:function_select,
+		:function_lottery
+	]
 
-	def function_fortune(sender_qq, sender_nickname, command, time)
+	def function_fortune(_, sender, command, time)
 		if COMMAND_FORTUNE =~ command
-			date = Time.at(time)
-			level = random(get_seed(date) * sender_qq, 6) % 100 # 迷之伪随机6
-			"#{get_date_string(date)}#{get_lunar_date_string(date)}#{sender_nickname} 的运势指数：#{STR_FORTUNE_LEVELS[level / 5]}(#{level})"
+			level = random(get_seed(time) * sender.number, 6) % 100 # 迷之伪随机6
+			"#{get_date_string(time)}#{get_lunar_date_string(time)}#{sender.name} 的运势指数：#{STR_FORTUNE_LEVELS[level / 5]}(#{level})"
 		end
 	end
 
 	def function_calender(_, _, command, time)
 		if COMMAND_CALENDER =~ command
-			date = Time.at(time)
-			seed = get_seed(date)
-			response = get_date_string(date) << get_lunar_date_string(date)
+			seed = get_seed(time)
+			response = get_date_string(time) << get_lunar_date_string(time)
+			#noinspection RubyResolve
 			@tmp_things = @things.clone
 			response << "宜：\n"
 			good_things(seed).each { |thing| response << "#{thing[:thing]}：#{thing[:good]}\n" }
@@ -127,9 +137,9 @@ MANUAL
 		end
 	end
 
-	def function_dice(sender_qq, _, command, time)
+	def function_dice(_, sender, command, time)
 		if COMMAND_DICE =~ command
-			"#{bot_name} 掷出了 #{random(get_seed(time) | time.sec | sender_qq, 5) % 6 + 1}" # 迷之伪随机5
+			"#{bot_name} 掷出了 #{random(get_seed(time) | time.sec | sender.number, 5) % 6 + 1}" # 迷之伪随机5
 		end
 	end
 
@@ -142,40 +152,42 @@ MANUAL
 				result = JSON.parse(Net::HTTP.get(URI("http://shiningco.sinaapp.com/api/birthday?day=#{month}/#{day}")))[JSON_KEY_RESULT]
 			else
 				specify_date = false
-				date = Time.at(time)
-				month = date.month
-				day = date.day
+				month = time.month
+				day = time.day
 				result = JSON.parse(Net::HTTP.get(URI('http://shiningco.sinaapp.com/api/birthday')))[JSON_KEY_RESULT]
 			end
 
 			if result
 				response = specify_date ? "#{month}月#{day}日 生日：\n" : "今日（#{month}月#{day}日）生日：\n"
+				#noinspection RubyResolve
 				result.sample(@birthday[:display_line]).each do |data|
 					response << "#{data[JSON_KEY_NAME]}（#{data[JSON_KEY_ORIGIN]}）\n"
 				end
 				response
 			else
+				#noinspection RubyResolve
 				specify_date ? "#{month}月#{day}日 #{@responses[:nobody_birthday].sample}" : "今日（#{month}月#{day}日）#{@responses[:nobody_birthday].sample}"
 			end
 		end
 	end
 
-	def function_true_false(sender_qq, _, command, time)
+	def function_true_false(_, sender, command, time)
 		if COMMAND_TRUE_FALSE =~ command
-			date = Time.at(time)
 			who = $~[:WHO]
 			act = $~[:ACT]
 			neg = $~[:NEG]
 			etc = $~[:ETC]
 			if who == STRING_YOU
+				#noinspection RubyResolve
 				@responses[:fuck].sample
 			elsif who != ''
 				if who == STRING_I
-					random(get_seed(date) * (act.sum * etc.sum) | sender_qq, 3).odd? ? "#{act}#{etc}！" : "#{neg}#{act}#{etc}……" # 迷之伪随机3
+					random(get_seed(time) * (act.sum * etc.sum) | sender.number, 3).odd? ? "#{act}#{etc}！" : "#{neg}#{act}#{etc}……" # 迷之伪随机3
 				else
-					random(get_seed(date) * (who.sum * act.sum * etc.sum), 3).odd? ? "#{who}#{act}#{etc}！" : "#{who}#{neg}#{act}#{etc}……" # 迷之伪随机3
+					random(get_seed(time) * (who.sum * act.sum * etc.sum), 3).odd? ? "#{who}#{act}#{etc}！" : "#{who}#{neg}#{act}#{etc}……" # 迷之伪随机3
 				end
 			else
+				#noinspection RubyResolve
 				@responses[:who].sample
 			end
 		end
@@ -183,25 +195,23 @@ MANUAL
 
 	def function_select(_, _, command, time)
 		if COMMAND_SELECT =~ command
-			date = Time.at(time)
-
 			select1 = $~[:SELECT1]
 			select2 = $~[:SELECT2]
 
 			select1, select2 = select2, select1 if select1.sum > select2.sum
 
 			if select1 == select2
+				#noinspection RubyResolve
 				@responses[:same].sample
 			else
-				random(get_seed(date) * (select1.sum * select2.sum), 2).odd? ? select1 : select2 # 迷之伪随机2
+				random(get_seed(time) * (select1.sum * select2.sum), 2).odd? ? select1 : select2 # 迷之伪随机2
 			end
 		end
 	end
 
-	def function_lottery(sender_qq, _, command, time)
+	def function_lottery(_, sender, command, time)
 		if command =~ COMMAND_LOTTERY
-			date = Time.at(time)
-			seed = get_seed(date) | sender_qq
+			seed = get_seed(time) | sender.number
 			<<RESPONSE
 红复：#{Array.new(6) { |i| '%02d' % (random(seed, i) % 33 + 1) }.join(' ')}
 蓝单：#{random(seed, 6) % 16 + 1}
@@ -209,19 +219,7 @@ RESPONSE
 		end
 	end
 
-	CHINESE_DIGIT_TO_ARAB_DIGIT = {
-		'一' => 1,
-		'二' => 2,
-		'三' => 3,
-		'四' => 4,
-		'五' => 5,
-		'六' => 6,
-		'七' => 7,
-		'八' => 8,
-		'九' => 9,
-		'十' => 10,
-	}
-
+	# @return [Integer]
 	def try_convert_to_integer(string)
 		integer = string.to_i
 		return integer if integer != 0
@@ -293,9 +291,9 @@ DATE
 	def good_things(seed)
 		good_things = []
 		sg = random(seed, 8) % 100 # 迷之伪随机8
+		#noinspection RubyResolve
 		(random(seed, 9) % (@max_good - @min_good) + @min_good).times do # 迷之伪随机9
 			good_things << @tmp_things.delete_at((sg * 0.01 * @tmp_things.size).to_i)
-
 		end
 		good_things
 	end
@@ -304,6 +302,7 @@ DATE
 	def bad_things(seed)
 		bad_things = []
 		sb = random(seed, 4) % 100 # 迷之伪随机4
+		#noinspection RubyResolve
 		(random(seed, 7) % (@max_bad - @min_bad) + @min_bad).times do # 迷之伪随机7
 			bad_things << @tmp_things.delete_at((sb * 0.01 * @tmp_things.size).to_i)
 		end

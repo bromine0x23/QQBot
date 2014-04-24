@@ -100,6 +100,7 @@ module WebQQProtocol
 
 		def get(uri)
 			log("HTTP GET: #{uri}", Logger::DEBUG) if $-d
+			#noinspection RubyResolve
 			Net::HTTP.start(uri.host, uri.port, read_timeout: 10, use_ssl: uri.scheme == SCHEME_HTTPS, verify_mode: OpenSSL::SSL::VERIFY_NONE) do |http|
 				@header[KEY_COOKIE] = @cookies.to_s
 				response = http.request(Net::HTTP::Get.new(uri, @header))
@@ -111,6 +112,7 @@ module WebQQProtocol
 
 		def post(uri, data)
 			log("HTTP POST: #{uri}\nDATA: #{data}", Logger::DEBUG) if $-d
+			#noinspection RubyResolve
 			Net::HTTP.start(uri.host, uri.port, read_timeout: 10, use_ssl: uri.scheme == SCHEME_HTTPS, verify_mode: OpenSSL::SSL::VERIFY_NONE) do |http|
 				@header[KEY_COOKIE] = @cookies.to_s
 				response = http.request(Net::HTTP::Post.new(uri, @header), data)
@@ -191,6 +193,7 @@ module WebQQProtocol
 		end
 
 		# MD5哈希
+		#noinspection RubyResolve
 		def self.md5(src)
 			Digest::MD5.hexdigest(src).upcase
 		end
@@ -287,6 +290,7 @@ LOG
 				redo_count = 0
 				begin
 					log('线程启动……', Logger::DEBUG) if $-d
+					#noinspection RubyResolve
 					https = Net::HTTP.start(HOST_D_WEB2_QQ, 443, use_ssl: true, verify_mode: OpenSSL::SSL::VERIFY_NONE)
 					init_header = {
 						HEADER_KEY_USER_AGENT => HEADER_USER_AGENT,
@@ -444,7 +448,7 @@ LOG
 	class QQFriend < QQEntity
 		TYPE = 'QQ好友'
 
-		def initialize(uin, qq_number, markname = nil)
+		def initialize(uin, number, name = nil)
 			super
 		end
 	end
@@ -452,7 +456,7 @@ LOG
 	class QQGroupMember < QQEntity
 		TYPE = 'QQ群成员'
 
-		def initialize(uin, number, card = nil)
+		def initialize(uin, number, name = nil)
 			super
 		end
 	end
@@ -487,6 +491,7 @@ LOG
 		end
 	end
 
+	#noinspection RubyTooManyInstanceVariablesInspection
 	class Client
 		GET_FRIENDS_HELLO_MESSAGE = 'hello'
 

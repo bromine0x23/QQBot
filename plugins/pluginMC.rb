@@ -1,21 +1,19 @@
-#!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
-class PluginMC < PluginNicknameResponserBase
+class PluginMC < PluginNicknameResponderCombineFunctionBase
 	NAME = 'MC插件'
 	AUTHOR = 'BR'
-	VERSION = '1.8'
+	VERSION = '1.9'
 	DESCRIPTION = 'MC合成表查询'
 	MANUAL = <<MANUAL.strip
 == 合成表查询 ==
-MC 合成 <物品>（用逗号(,，)分割）
+MC 合成 <物品>
 MANUAL
 	PRIORITY = 0
 
-	COMMAND_PATTERN = /^MC\s*合成\s*(?<item_names>.+)/i
+	COMMAND_RECIPE = /^合成\s*(?<item_name>.+)/
 
-	SEPARATORS = /,|，/
-
+	#noinspection RubyResolve
 	def on_load
 		super
 		@alias = @data['alias']
@@ -24,12 +22,13 @@ MANUAL
 		@recipe.default_proc = proc { |hash, key| hash[key] = "不存在物品：#{key} 的合成公式" }
 	end
 
-	def get_response(uin, sender_qq, sender_nickname, message, time)
-		# super # FOR DEBUG
-		if COMMAND_PATTERN =~ message
-			<<RESPONSE
-#{response_header_with_nickname(sender_nickname)}#{$~[:item_names].split(SEPARATORS).map{|item_name| @recipe[@alias[item_name]]}.join("\n")}
-RESPONSE
+	def command_header
+		'MC'
+	end
+
+	def function_recipe(_, _, command, _)
+		if COMMAND_RECIPE =~ command
+			@recipe[@alias[$~[:item_name]]]
 		end
 	end
 end

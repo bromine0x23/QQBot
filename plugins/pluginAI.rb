@@ -1,12 +1,11 @@
-#!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
 require 'sqlite3'
 
-class PluginAI < PluginNicknameResponserBase
+class PluginAI < PluginNicknameResponderCombineFunctionBase
 	NAME = 'AI插件'
 	AUTHOR = 'BR'
-	VERSION = '1.11'
+	VERSION = '1.12'
 	DESCRIPTION = '人家才不是AI呢'
 	MANUAL = <<MANUAL.strip!
 == 复述 ==
@@ -31,7 +30,7 @@ MANUAL
 	DB_FILE = "#{PLUGIN_DIRECTORY}/pluginAI.db"
 
 	SQL_CREATE_TABLE_MESSAGES = <<SQL
-CREATE TABLE messages (
+CREATE TABLE IF NOT EXISTS messages (
 	id         INTEGER PRIMARY KEY AUTOINCREMENT,
 	message    TEXT NOT NULL,
 	created_by INTEGER NOT NULL,
@@ -41,7 +40,7 @@ CREATE TABLE messages (
 SQL
 
 	SQL_CREATE_TABLE_RESPONSES = <<SQL
-CREATE TABLE responses (
+CREATE TABLE IF NOT EXISTS responses (
 	id         INTEGER PRIMARY KEY AUTOINCREMENT,
 	response   TEXT NOT NULL,
 	created_by INTEGER NOT NULL,
@@ -51,7 +50,7 @@ CREATE TABLE responses (
 SQL
 
 	SQL_CREATE_TABLE_RELATIONS = <<SQL
-CREATE TABLE relations (
+CREATE TABLE IF NOT EXISTS relations (
 	message_id  INTEGER REFERENCES messages (id),
 	response_id INTEGER REFERENCES response (id),
 	created_by  INTEGER NOT NULL,
@@ -61,7 +60,7 @@ CREATE TABLE relations (
 SQL
 
 	SQL_CREATE_INDEX_RELATIONS = <<SQL
-CREATE INDEX index_message_id ON relations (message_id)
+CREATE INDEX IF NOT EXISTS index_message_id ON relations (message_id)
 SQL
 
 	SQL_CHECK_TABLE = <<SQL
@@ -69,7 +68,9 @@ SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?
 SQL
 
 	SQL_GET_MESSAGE_ID = <<SQL
-SELECT id FROM messages WHERE message = ?
+SELECT id
+FROM messages
+WHERE message = ?
 SQL
 
 	SQL_GET_RESPONSE_ID = <<SQL
@@ -77,17 +78,23 @@ SELECT id FROM responses WHERE response = ?
 SQL
 
 	SQL_INSERT_MESSAGE = <<SQL
-INSERT OR IGNORE INTO messages (message, created_by, created_at) VALUES (?, ?, ?)
+INSERT OR IGNORE
+INTO messages (message, created_by, created_at)
+VALUES (?, ?, ?)
 SQL
 
 	SQL_INSERT_RESPONSE = <<SQL
-INSERT OR IGNORE INTO responses (response, created_by, created_at) VALUES (?, ?, ?)
+INSERT OR IGNORE
+INTO responses (response, created_by, created_at)
+VALUES (?, ?, ?)
 SQL
 
 	SQL_INSERT_RELATION = <<SQL
 INSERT OR IGNORE
-	INTO relations (message_id, response_id, created_by, created_at)
-	SELECT messages.id, responses.id, ?, ? FROM messages, responses WHERE message = ? AND response = ?
+INTO relations (message_id, response_id, created_by, created_at)
+	SELECT messages.id, responses.id, ?, ?
+	FROM messages, responses
+	WHERE message = ? AND response = ?
 SQL
 
 	SQL_SELECT_RESPONSES = <<SQL
@@ -127,65 +134,58 @@ SQL
 
 	def prepare_db
 		@db = SQLite3::Database.open DB_FILE
-		@db.execute SQL_CREATE_TABLE_MESSAGES  if @db.get_first_value(SQL_CHECK_TABLE, 'messages').zero?
-		@db.execute SQL_CREATE_TABLE_RESPONSES if @db.get_first_value(SQL_CHECK_TABLE, 'responses').zero?
-		if @db.get_first_value(SQL_CHECK_TABLE, 'relations').zero?
-			@db.execute SQL_CREATE_TABLE_RELATIONS
-			@db.execute SQL_CREATE_INDEX_RELATIONS
-		end
-		log('数据库准备完毕', Logger::DEBUG) if $-d
+		@db.execute SQL_CREATE_TABLE_MESSAGES
+		@db.execute SQL_CREATE_TABLE_RESPONSES
+		@db.execute SQL_CREATE_TABLE_RELATIONS
+		@db.execute SQL_CREATE_INDEX_RELATIONS
 	end
 
 	def on_unload
 		super
 		@db.close
-		log('数据库连接断开', Logger::DEBUG) if $-d
 	end
 
-	def get_response(uin, sender_qq, sender_nickname, command, time)
-		# super # FOR DEBUG
-		function_say(command) or function_forget(command) or function_learn(command, sender_qq) or function_response(command, sender_nickname)
-	end
-
-	def function_say(command)
+	def function_say(_, _, command, _)
 		$~[:response] if COMMAND_SAY =~ command
 	end
 
-	def function_forget(command)
+	def function_forget(_, _, command, _)
 		if COMMAND_FORGET =~ command
 			@db.transaction do |db|
 				db.execute(SQL_DELETE_RELATIONS, $~[:message].strip)
 			end
-			@responses[:forgeted].sample
+			#noinspection RubyResolve
+			@responses[:forgot].sample
 		end
 	end
 
-	def function_learn(command, sender_qq)
+	def function_learn(_, sender, command, time)
 		if COMMAND_LEARN =~ command
 			command = $~[:command]
 			if COMMAND_LEARN_MULTILINE =~ command or COMMAND_LEARN_TOWLINE =~ command or COMMAND_LEARN_ONELINE =~ command
 				response = $~[:response].strip
-				if response.length < @responce_limit
+				#noinspection RubyResolve
+				if response.length < @response_limit
 					message = $~[:message].strip
 					@db.transaction do |db|
-						time = Time.now.to_i
-						db.execute(SQL_INSERT_MESSAGE, message, sender_qq, time) unless db.get_first_value(SQL_GET_MESSAGE_ID, message)
-						db.execute(SQL_INSERT_RESPONSE, response, sender_qq, time) unless db.get_first_value(SQL_GET_RESPONSE_ID, response)
-						db.execute(SQL_INSERT_RELATION, sender_qq, time, message, response)
+						db.execute(SQL_INSERT_MESSAGE, message, sender.number, time.to_i)
+						db.execute(SQL_INSERT_RESPONSE, response, sender.number, time.to_i)
+						db.execute(SQL_INSERT_RELATION, sender.number, time.to_i, message, response)
 					end
 					@responses[:learned].sample
 				else
-					@responses[:toolong].sample
+					@responses[:too_long].sample
 				end
 			end
 		end
 	end
 
-	def function_response(command, sender_nickname)
+	def function_response(_, sender, command, _)
 		result = @db.execute(SQL_SELECT_RESPONSES, command).map!{ |row| row[0] }.sample
 		if result
-			result.gsub(/#{PLACEHOLDER_I}|#{PLACEHOLDER_YOU}/, PLACEHOLDER_I => bot_name, PLACEHOLDER_YOU => sender_nickname)
+			result.gsub(/#{PLACEHOLDER_I}|#{PLACEHOLDER_YOU}/, PLACEHOLDER_I => bot_name, PLACEHOLDER_YOU => sender.name)
 		else
+			#noinspection RubyResolve
 			@responses[:null].sample
 		end
 	end

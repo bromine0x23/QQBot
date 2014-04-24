@@ -17,6 +17,9 @@ tmp
 _yardoc
 doc/
 
+# RubyMine 工程
+.idea
+
 # 配置文件
 *.config
 *.yaml

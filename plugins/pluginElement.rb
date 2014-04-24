@@ -1,19 +1,18 @@
-#!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
 require 'yaml'
 
-class PluginElement < PluginNicknameResponserBase
+class PluginElement < PluginNicknameResponderBase
 	NAME = '化学元素插件'
 	AUTHOR = 'BR'
-	VERSION = '1.5'
+	VERSION = '1.6'
 	DESCRIPTION = '食我方块达人门捷列夫'
 	MANUAL = <<MANUAL.strip!
-[化学]元素 <元素名|元素序号>
+化学元素 <元素名|元素序号>
 MANUAL
 	PRIORITY = 0
 
-	COMMAND_PATTERN = /^(化学)?元素\s*(?<element>.+)/
+	COMMAND_PATTERN = /^化学元素\s*(?<element>.+)/
 
 	def join_element_data(element)
 		string = "No.#{element[:原子序数]} #{element[:符号]}（"
@@ -28,8 +27,9 @@ MANUAL
 		string
 	end
 
-	def get_response(uin, sender_qq, sender_nickname, message, time)
-		if COMMAND_PATTERN =~ message
+	#noinspection RubyResolve
+	def get_response(_, _, command, _)
+		if COMMAND_PATTERN =~ command
 			element_name = $~[:element]
 			element_index = @data[:原子序号索引][element_name]
 			if element_index

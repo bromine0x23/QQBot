@@ -7,6 +7,7 @@ require 'set'
 
 # $DEBUG = true
 
+#noinspection RubyTooManyInstanceVariablesInspection
 class QQBot
 	FILE_CONFIG = 'config.yaml'
 	FILE_PLUGIN_RULES = 'plugin_rules.yaml'
@@ -49,7 +50,18 @@ LOG
 
 		def unload_plugins
 			save_rules
-			@plugins.pop.on_unload until @plugins.empty?
+			until @plugins.empty?
+				begin
+					plugin = @plugins.pop
+					plugin.on_unload
+				rescue Exception => ex
+					log(<<LOG, Logger::ERROR)
+卸载插件 #{plugin.name} 时发生异常：#{ex}
+调用栈：
+#{ex.backtrace.join("\n")}
+LOG
+				end
+			end
 			PluginBase.plugins.each do |plugin|
 				Object.send(:remove_const, plugin.name.to_sym)
 			end
@@ -147,12 +159,12 @@ LOG
 
 	attr_reader :bot_name
 	attr_reader :masters
-	attr_reader :plugin_adminsrator
+	attr_reader :plugin_administrator
 
 	def initialize
 		load_config
 		init_logger
-		@plugin_adminsrator = PluginAdministrator.new(self, @logger)
+		@plugin_administrator = PluginAdministrator.new(self, @logger)
 	end
 
 	def load_config
@@ -193,7 +205,7 @@ LOG
 				datas = @message_receiver.data
 				log("data => #{datas}") if $-d
 				datas.each do |data|
-					@plugin_adminsrator.on_event(data)
+					@plugin_administrator.on_event(data)
 				end
 			end
 		ensure
@@ -227,45 +239,45 @@ LOG
 	end
 
 	def plugin(plugin_name)
-		@plugin_adminsrator.plugins.find{ |plugin| plugin.name == plugin_name }
+		@plugin_administrator.plugins.find{ |plugin| plugin.name == plugin_name }
 	end
 
 	def plugins(uin)
 		entity = entity uin
-		entity.is_a?(WebQQProtocol::QQGroup) ? @plugin_adminsrator.filtered_plugins(entity.number) : @plugin_adminsrator.plugins
+		entity.is_a?(WebQQProtocol::QQGroup) ? @plugin_administrator.filtered_plugins(entity.number) : @plugin_administrator.plugins
 	end
 
 	def load_plugins
-		@plugin_adminsrator.load_plugins
+		@plugin_administrator.load_plugins
 	end
 
 	def unload_plugins
-		@plugin_adminsrator.unload_plugins
+		@plugin_administrator.unload_plugins
 	end
 
 	def reload_plugins
-		@plugin_adminsrator.reload_plugins
+		@plugin_administrator.reload_plugins
 	end
 
 	def enable_plugin(uin, qq_number, plugin)
-		@plugin_adminsrator.enable_plugin(uin, qq_number, plugin)
+		@plugin_administrator.enable_plugin(uin, qq_number, plugin)
 		true
 	end
 
 	def disable_plugin(uin, qq_number, plugin)
-		@plugin_adminsrator.disable_plugin(uin, qq_number, plugin)
+		@plugin_administrator.disable_plugin(uin, qq_number, plugin)
 		true
 	end
 
 	# @return [TrueClass or FalseClass]
 	def forbidden?(plugin_name, uin)
 		entity = entity uin
-		entity.is_a?(WebQQProtocol::QQGroup) and @plugin_adminsrator.forbidden?(plugin_name, entity.number)
+		entity.is_a?(WebQQProtocol::QQGroup) and @plugin_administrator.forbidden?(plugin_name, entity.number)
 	end
 
 	def administrator?(uin, qq_number)
 		entity = entity uin
-		entity.is_a?(WebQQProtocol::QQGroup) and @plugin_adminsrator.administrator?(entity.number, qq_number) or master?(qq_number)
+		entity.is_a?(WebQQProtocol::QQGroup) and @plugin_administrator.administrator?(entity.number, qq_number) or master?(qq_number)
 	end
 
 	def master?(qq_number)

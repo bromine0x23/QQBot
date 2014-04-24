@@ -1,10 +1,7 @@
-#!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
 # 插件源文件名应匹配 /plugin*.rb/
 # 类名匹配 /Plugin.*Base/ 的类不会生成实例（载入）
-
-# 
 
 # 最基础的插件类
 class PluginTemplate < PluginBase
@@ -106,7 +103,7 @@ MANUAL
 end
 
 # 回应群或好友消息的插件
-class PluginResponserTemplate < PluginResponserBase
+class PluginResponderTemplate < PluginResponderBase
 
 	# protected 实例方法
 	# response_header_with_nickname(nickname) # 获得对昵称的回应头
@@ -117,19 +114,19 @@ class PluginResponserTemplate < PluginResponserBase
 	# content         => 消息内容
 	# time            => 时间（以秒数）
 
-	def deal_message(uin, sender_qq, sender_nickname, content, time)
+	def deal_message(sender, content, time)
 		super
 		# 处理好友消息响应
 	end
 
-	def deal_group_message(guin, sender_qq, sender_nickname, content, time)
+	def deal_group_message(from, sender, content, time)
 		super
 		# 处理群消息响应
 	end
 end
 
 # 在群中需要用昵称用呼叫的插件
-class PluginNicknameResponserTemplate < PluginNicknameResponserBase
+class PluginNicknameResponderTemplate < PluginNicknameResponderBase
 	# public 实例方法
 	# bot_name() # 获得机器人的名字
 
@@ -139,7 +136,7 @@ class PluginNicknameResponserTemplate < PluginNicknameResponserBase
 	# message         => 消息文本
 	# time            => 时间（以秒数）
 	# 返回值在不为false或nil时会作为回应消息发送
-	def get_response(uin, sender_qq, sender_nickname, message, time)
+	def get_response(from, sender, command, time)
 		nil or false or '回应消息'
 	end
 end

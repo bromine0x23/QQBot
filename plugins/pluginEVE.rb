@@ -1,7 +1,5 @@
-#!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
-require 'yaml'
 require 'json'
 require 'net/http'
 require 'uri'
@@ -11,10 +9,10 @@ require 'rexml/document'
 使用EVE国服市场中心的物价查询API
 参见：http://www.ceve-market.org/api/
 =end
-class PluginEVE < PluginNicknameResponserBase
+class PluginEVE < PluginNicknameResponderCombineFunctionBase
 	NAME = 'EVE插件'
 	AUTHOR = 'BR'
-	VERSION = '1.8'
+	VERSION = '1.9'
 	DESCRIPTION = '我们的征途的星辰大海'
 	MANUAL = <<MANUAL.strip
 == 吉他价格查询 ==
@@ -25,11 +23,10 @@ EVE 空间站 <星系>
 MANUAL
 	PRIORITY = 0
 
-	CALL_PATTERN = /^EVE\s*(?<command>.+)/i
 	COMMAND_MINERAL      = /^基础矿物$/
-	COMMAND_ITEM_INFO    = /^物品\s*(?<item_name>.+)$/
-	COMMAND_STATION_INFO = /^空间站\s*(?<system_name>.+)$/
-	COMMAND_SYSTEM_INFO  = /^星系\s*(?<system_name>.+)$/
+	COMMAND_ITEM_INFO    = /^物品\s*(?<item_name>.+)/
+	COMMAND_STATION_INFO = /^空间站\s*(?<system_name>.+)/
+	COMMAND_SYSTEM_INFO  = /^星系\s*(?<system_name>.+)/
 	COMMAND_MARKET       = /^市场\s*(?<item_name>.+)/
 
 	URI_MINERAL = 'http://www.ceve-market.org/api/evemon'
@@ -51,11 +48,11 @@ SQL
 SELECT id, description, volume, mass, marketgroup_id FROM items WHERE name = ?
 SQL
 
-	SQL_SELECT_MARKGROUP = <<SQL
+	SQL_SELECT_MARKETGROUP = <<SQL
 SELECT name, parent_id FROM marketgroups WHERE id = ?
 SQL
 
-	SQL_SELECT_ITEM_ATTRITUBES = <<SQL
+	SQL_SELECT_ITEM_ATTRIBUTES = <<SQL
 SELECT attributes.name, item_attributes.value, units.name
 FROM item_attributes, attributes, units
 WHERE item_attributes.item_id = ? AND item_attributes.attribute_id = attributes.id AND attributes.unit_id = units.id
@@ -83,23 +80,17 @@ SQL
 		@db.close
 	end
 
+	def command_header
+		'EVE'
+	end
+
+	#noinspection RubyResolve
 	def format_price(price)
 		price.round(2).to_s.gsub(PATTERN_THOUSAND_SEPARATOR, @thousand_separator)
 	end
 
-	def get_response(uin, sender_qq, sender_nickname, command, time)
-		# super # FOR DEBUG
-		if CALL_PATTERN =~ command
-			command = $~[:command]
-			function_mineral(     uin, sender_qq, sender_nickname, command, time) ||
-			function_item_info(   uin, sender_qq, sender_nickname, command, time) ||
-			function_station_info(uin, sender_qq, sender_nickname, command, time) ||
-			function_market(      uin, sender_qq, sender_nickname, command, time) ||
-			function_system_info( uin, sender_qq, sender_nickname, command, time)
-		end
-	end
-
-	def function_mineral(_, _, _, command, _)
+	#noinspection RubyResolve
+	def function_mineral(_, _, command, _)
 		if COMMAND_MINERAL =~ command
 			response = ''
 			REXML::Document.new(Net::HTTP.get(URI(URI_MINERAL))).each_element(XPATH_MINERAL) do |element|
@@ -111,7 +102,8 @@ RESPONSE
 		end
 	end
 
-	def function_market(_, _, _, command, _)
+	#noinspection RubyResolve
+	def function_market(_, _, command, _)
 		if COMMAND_MARKET =~ command
 			item_name = $~[:item_name]
 			item_id = @db.get_first_value(SQL_SELECT_ITEM_ID, item_name)
@@ -125,12 +117,13 @@ RESPONSE
 出售：#{sell ? format_price(sell) : @responses[:no_price]} #{@units[:price]}
 RESPONSE
 			else
-				@responses[:no_item] % item_name
+				@responses[:no_item] % {item_name: item_name}
 			end
 		end
 	end
 
-	def function_item_info(_, _, _, command, _)
+	#noinspection RubyResolve
+	def function_item_info(_, _, command, _)
 		if COMMAND_ITEM_INFO =~ command
 			item_name = $~[:item_name]
 			result = @db.get_first_row(SQL_SELECT_ITEM, item_name)
@@ -142,13 +135,13 @@ RESPONSE
 				marketgroup_id = result[4]
 				marketgroup_names = []
 				while marketgroup_id
-					@db.execute(SQL_SELECT_MARKGROUP, marketgroup_id) do |row|
+					@db.execute(SQL_SELECT_MARKETGROUP, marketgroup_id) do |row|
 						marketgroup_names << row[0]
 						marketgroup_id = row[1]
 					end
 				end
 				item_attributes = []
-				@db.execute(SQL_SELECT_ITEM_ATTRITUBES, item_id) do |row|
+				@db.execute(SQL_SELECT_ITEM_ATTRIBUTES, item_id) do |row|
 					item_attributes << "#{row[0]}：#{row[1]} #{row[2]}"
 				end
 				<<RESPONSE
@@ -159,11 +152,12 @@ RESPONSE
 #{item_attributes.join("\n")}
 RESPONSE
 			else
-				@responses[:no_item] % item_name
+				@responses[:no_item] % {item_name: item_name}
 			end
 		end
 	end
 
+	#noinspection RubyResolve
 	def function_station_info(_, _, _, command, _)
 		if COMMAND_STATION_INFO =~ command
 			system_name = $~[:system_name]
@@ -176,6 +170,7 @@ RESPONSE
 		end
 	end
 
+	#noinspection RubyResolve
 	def function_system_info(_, _, _, command, _)
 		if COMMAND_SYSTEM_INFO =~ command
 			system_name = $~[:system_name]
@@ -194,7 +189,7 @@ RESPONSE
 #{near_systems.empty? ? '无' : near_systems}
 RESPONSE
 			else
-				@responses[:no_system] % system_name
+				@responses[:no_system] % {system_name: system_name}
 			end
 		end
 	end

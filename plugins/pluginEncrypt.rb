@@ -10,10 +10,9 @@ class PluginEncrypt < PluginNicknameResponderCombineFunctionBase
 	VERSION = '1.1'
 	DESCRIPTION = '字符串加密（哈希）'
 	MANUAL = <<MANUAL.strip
-加密 <加密方法> <源串>
-==== 支持的加密方法 ====
-Base64 佛曰 MD5
-SHA1 SHA256 SHA384 SHA512
+[问佛|参悟] <内容>
+[编码|解码] Base64 <内容>
+计算 [MD5|SHA1|SHA256|SHA384|SHA512]
 MANUAL
 	PRIORITY = 0
 

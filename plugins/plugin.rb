@@ -2,6 +2,7 @@
 
 require 'yaml'
 
+#noinspection RubyClassVariableUsageInspection,RubyTooManyMethodsInspection
 class PluginBase
 	NAME = '插件基类'
 	AUTHOR = 'BR'
@@ -191,6 +192,7 @@ MANUAL
 
 	STR_BASE = 'Base'
 
+	# @param [Class] subclass
 	def self.inherited(subclass)
 		@@plugins.unshift subclass
 		@@instance_plugins << subclass unless subclass.name.end_with? STR_BASE
@@ -204,12 +206,6 @@ class PluginResponderBase < PluginBase
 	KEY_SEND_UIN = 'send_uin'
 	KEY_CONTENT  = 'content'
 	KEY_TIME     = 'time'
-	
-	def response_header_with_nickname(sender)
-		response = <<RESPONSE
-回 #{sender} 大人：
-RESPONSE
-	end
 
 	# @param [Hash] value
 	def on_message(value)
@@ -247,10 +243,6 @@ end
 class PluginNicknameResponderBase < PluginResponderBase
 	NAME = '昵称呼叫型消息回应插件基类'
 
-	def bot_name
-		@qqbot.bot_name
-	end
-
 	def deal_message(sender, content, time)
 		response_or_ignore(sender, sender, QQBot.message(content), time, @send_message)
 	end
@@ -278,13 +270,22 @@ class PluginNicknameResponderBase < PluginResponderBase
 	def get_response(from, sender, command, time)
 		# 桩方法，处理消息响应
 	end
+
+	protected
+
+	def bot_name
+		@qqbot.bot_name
+	end
 end
 
 #noinspection ALL
 class PluginNicknameResponderCombineFunctionBase < PluginNicknameResponderBase
+
+	COMMAND_HEADER = ''
+
 	# @return [String]
 	def command_header
-		''
+		self.class::COMMAND_HEADER
 	end
 
 	# @return [Regexp]
@@ -301,8 +302,8 @@ class PluginNicknameResponderCombineFunctionBase < PluginNicknameResponderBase
 		if command_pattern =~ command
 			command = $~[:command]
 			response = nil
-			fuctions.each do |symbol|
-				response = send(symbol, from, sender, command, time)
+			fuctions.each do |function|
+				response = send(function, from, sender, command, time)
 				break if response
 			end
 			response

@@ -105,20 +105,21 @@ end
 # 回应群或好友消息的插件
 class PluginResponderTemplate < PluginResponderBase
 
-	# protected 实例方法
-	# response_header_with_nickname(nickname) # 获得对昵称的回应头
+	# 实例方法
+	# bot_name -> String # 获得QQBot名字
 
-	# uin             => 群或好友的uin
-	# sender_qq       => 消息发送者的Q号
-	# sender_nickname => 消息发送者的群名片（如果有）或昵称
-	# content         => 消息内容
-	# time            => 时间（以秒数）
-
+	# [WebQQProtocol::QQFriend] sender  => 消息发送者
+	# [String]                  command => 命令
+	# [Time]                    time    => 时间
 	def deal_message(sender, content, time)
 		super
 		# 处理好友消息响应
 	end
 
+	# [WebQQProtocol::QQGroup]       from    => 消息来自的群
+	# [WebQQProtocol::QQGroupMember] sender  => 消息发送者
+	# [String]                       command => 命令
+	# [Time]                         time    => 时间
 	def deal_group_message(from, sender, content, time)
 		super
 		# 处理群消息响应
@@ -126,17 +127,33 @@ class PluginResponderTemplate < PluginResponderBase
 end
 
 # 在群中需要用昵称用呼叫的插件
+#noinspection RubyClassModuleNamingConvention
 class PluginNicknameResponderTemplate < PluginNicknameResponderBase
-	# public 实例方法
-	# bot_name() # 获得机器人的名字
 
-	# uin             => 群或好友的uin
-	# sender_qq       => 消息发送者的Q号
-	# sender_nickname => 消息发送者的群名片（如果有）或昵称
-	# message         => 消息文本
-	# time            => 时间（以秒数）
+	# [WebQQProtocol::QQEntity] from    => 消息来自何处，好友[WebQQProtocol::QQFriend]或群[WebQQProtocol::QQGroup]
+	# [WebQQProtocol::QQEntity] sender  => 消息发送者，好友[WebQQProtocol::QQFriend]或群成员[WebQQProtocol::QQGroupMember]
+	# [String]                  command => 命令
+	# [Time]                    time    => 时间
 	# 返回值在不为false或nil时会作为回应消息发送
 	def get_response(from, sender, command, time)
 		nil or false or '回应消息'
 	end
+end
+
+#noinspection RubyClassModuleNamingConvention
+class PluginNicknameResponderCombineFunctionTemplate < PluginNicknameResponderCombineFunctionBase
+
+	# [WebQQProtocol::QQEntity] from    => 消息来自何处，好友[WebQQProtocol::QQFriend]或群[WebQQProtocol::QQGroup]
+	# [WebQQProtocol::QQEntity] sender  => 消息发送者，好友[WebQQProtocol::QQFriend]或群成员[WebQQProtocol::QQGroupMember]
+	# [String]                  command => 命令
+	# [Time]                    time    => 时间
+	def function_template1(from, sender, command, time)
+		nil or false or '回应消息'
+	end
+
+	def function_template2(from, sender, command, time)
+		nil or false or '回应消息'
+	end
+
+	# 在接收到消息时自动依声明顺序调用各 function_XXX 方法，直到获得回应消息
 end

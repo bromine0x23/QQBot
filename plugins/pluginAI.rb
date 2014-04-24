@@ -8,22 +8,25 @@ class PluginAI < PluginNicknameResponderCombineFunctionBase
 	VERSION = '1.12'
 	DESCRIPTION = '人家才不是AI呢'
 	MANUAL = <<MANUAL.strip!
-== 复述 ==
+======== 复述 ========
 说 <复述内容>
-== 整句学习 ==
-================
-学习 <行内句子1> <行内句子2>
-================
+======== 忘记 =======
+忘记 <消息>
+======== 学习 ========
+==== 替代 ====
+　%{我} -> 机器人昵称
+　%{你} -> 消息发送者昵称
+===== 短语消息 =====
+学习 <消息短语> <响应短语>
+===== 单行消息 ====
 学习
-<单行句子1>
-<多行句子2>
-================
+<单行消息句子>
+<多行响应句子>
+===== 多行消息 ====
 学习=<分界符>
-<多行句子1>
+<多行消息句子>
 <分界符>
-<多行句子2>
-================
-忘记 <句子>
+<多行响应句子>
 MANUAL
 	PRIORITY = -8
 
@@ -61,20 +64,6 @@ SQL
 
 	SQL_CREATE_INDEX_RELATIONS = <<SQL
 CREATE INDEX IF NOT EXISTS index_message_id ON relations (message_id)
-SQL
-
-	SQL_CHECK_TABLE = <<SQL
-SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?
-SQL
-
-	SQL_GET_MESSAGE_ID = <<SQL
-SELECT id
-FROM messages
-WHERE message = ?
-SQL
-
-	SQL_GET_RESPONSE_ID = <<SQL
-SELECT id FROM responses WHERE response = ?
 SQL
 
 	SQL_INSERT_MESSAGE = <<SQL
@@ -124,9 +113,6 @@ SQL
 	COMMAND_LEARN_TOWLINE   = /^[\r\n](?<message>[^\r\n]+)[\r\n]+(?<response>.+)/m
 	COMMAND_LEARN_MULTILINE = /^=(?<delimiter>\w+)\s*[\r\n](?<message>.+?)[\r\n]\k<delimiter>(?<response>.+)/m
 
-	PLACEHOLDER_I   = '{我}'
-	PLACEHOLDER_YOU = '{你}'
-
 	def on_load
 		super
 		prepare_db
@@ -134,10 +120,12 @@ SQL
 
 	def prepare_db
 		@db = SQLite3::Database.open DB_FILE
-		@db.execute SQL_CREATE_TABLE_MESSAGES
-		@db.execute SQL_CREATE_TABLE_RESPONSES
-		@db.execute SQL_CREATE_TABLE_RELATIONS
-		@db.execute SQL_CREATE_INDEX_RELATIONS
+		@db.transaction do |db|
+			db.execute SQL_CREATE_TABLE_MESSAGES
+			db.execute SQL_CREATE_TABLE_RESPONSES
+			db.execute SQL_CREATE_TABLE_RELATIONS
+			db.execute SQL_CREATE_INDEX_RELATIONS
+		end
 	end
 
 	def on_unload
@@ -163,10 +151,10 @@ SQL
 		if COMMAND_LEARN =~ command
 			command = $~[:command]
 			if COMMAND_LEARN_MULTILINE =~ command or COMMAND_LEARN_TOWLINE =~ command or COMMAND_LEARN_ONELINE =~ command
+				message  = $~[:message].strip
 				response = $~[:response].strip
 				#noinspection RubyResolve
 				if response.length < @response_limit
-					message = $~[:message].strip
 					@db.transaction do |db|
 						db.execute(SQL_INSERT_MESSAGE, message, sender.number, time.to_i)
 						db.execute(SQL_INSERT_RESPONSE, response, sender.number, time.to_i)
@@ -183,7 +171,7 @@ SQL
 	def function_response(_, sender, command, _)
 		result = @db.execute(SQL_SELECT_RESPONSES, command).map!{ |row| row[0] }.sample
 		if result
-			result.gsub(/#{PLACEHOLDER_I}|#{PLACEHOLDER_YOU}/, PLACEHOLDER_I => bot_name, PLACEHOLDER_YOU => sender.name)
+			result %  {我: bot_name, 你: sender.name}
 		else
 			#noinspection RubyResolve
 			@responses[:null].sample

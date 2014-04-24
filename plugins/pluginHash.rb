@@ -36,16 +36,14 @@ MANUAL
 	def function_buddha_encode(_, _, command, _)
 		if COMMAND_BUDDHA_ENCODE =~ command
 			Net::HTTP.post_form(URI_BUDDHA, 'orignalMsg' => $~[:src], 'action' => 'Encode')
-				.force_encoding('utf-8')
-				.body[BUDDHA_RESULT_PATTERN, :res]
+				.body.force_encoding('utf-8')[BUDDHA_RESULT_PATTERN, :res]
 		end
 	end
 
 	def function_buddha_decode(_, _, command, _)
 		if COMMAND_BUDDHA_DECODE =~ command
 			Net::HTTP.post_form(URI_BUDDHA, 'orignalMsg' => $~[:src], 'action' => 'Decode')
-				.force_encoding('utf-8')
-				.body[BUDDHA_RESULT_PATTERN, :res]
+				.body.force_encoding('utf-8')[BUDDHA_RESULT_PATTERN, :res]
 		end
 	end
 

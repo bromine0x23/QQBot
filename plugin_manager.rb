@@ -129,6 +129,7 @@ class PluginManager
 		PluginBase.instance_plugins.each do |plugin_class|
 			begin
 				plugin = plugin_class.new(@qqbot, @logger)
+				plugin.on_load
 				@plugins << plugin
 				registry_plugin(plugin)
 			rescue Exception => ex

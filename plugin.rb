@@ -30,8 +30,6 @@ MANUAL
 	def initialize(qqbot, logger)
 		@qqbot = qqbot
 		@logger = logger
-		on_load
-		log('初始化完毕', Logger::DEBUG) if $-d
 	end
 
 	# @return [String]

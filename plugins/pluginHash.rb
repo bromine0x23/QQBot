@@ -35,20 +35,25 @@ MANUAL
 
 	def function_buddha_encode(_, _, command, _)
 		if COMMAND_BUDDHA_ENCODE =~ command
-			Net::HTTP.post_form(URI_BUDDHA, 'orignalMsg' => $~[:src], 'action' => 'Encode').body[BUDDHA_RESULT_PATTERN, :res]
+			Net::HTTP.post_form(URI_BUDDHA, 'orignalMsg' => $~[:src], 'action' => 'Encode')
+				.force_encoding('utf-8')
+				.body[BUDDHA_RESULT_PATTERN, :res]
 		end
 	end
 
 	def function_buddha_decode(_, _, command, _)
 		if COMMAND_BUDDHA_DECODE =~ command
-			Net::HTTP.post_form(URI_BUDDHA, 'orignalMsg' => $~[:src], 'action' => 'Decode').body[BUDDHA_RESULT_PATTERN, :res]
+			Net::HTTP.post_form(URI_BUDDHA, 'orignalMsg' => $~[:src], 'action' => 'Decode')
+				.force_encoding('utf-8')
+				.body[BUDDHA_RESULT_PATTERN, :res]
 		end
 	end
 
 	def function_base64_encode(_, _, command, _)
 		if COMMAND_BASE64_ENCODE =~ command
 			<<RESPONSE
-Base64 编码结果：#{Base64.strict_encode64($~[:src])}
+Base64 编码结果：
+#{Base64.strict_encode64($~[:src])}
 RESPONSE
 		end
 	end
@@ -56,7 +61,8 @@ RESPONSE
 	def function_base64_decode(_, _, command, _)
 		if COMMAND_BASE64_DECODE =~ command
 			<<RESPONSE
-Base64 解码结果：#{Base64.strict_decode64($~[:src])}
+Base64 解码结果：
+#{Base64.strict_decode64($~[:src])}
 RESPONSE
 		end
 	end
@@ -65,7 +71,8 @@ RESPONSE
 	def function_md5(_, _, command, _)
 		if COMMAND_MD5 =~ command
 			<<RESPONSE
-MD5 计算结果：#{Digest::MD5.hexdigest($~[:src]).upcase}
+MD5 计算结果：
+#{Digest::MD5.hexdigest($~[:src]).upcase}
 RESPONSE
 		end
 	end
@@ -73,7 +80,8 @@ RESPONSE
 	def function_sha1(_, _, command, _)
 		if COMMAND_SHA1 =~ command
 			<<RESPONSE
-SHA1 计算结果：#{Digest::SHA1.hexdigest($~[:src]).upcase}
+SHA1 计算结果：
+#{Digest::SHA1.hexdigest($~[:src]).upcase}
 RESPONSE
 		end
 	end
@@ -82,7 +90,8 @@ RESPONSE
 	def function_sha256(_, _, command, _)
 		if COMMAND_SHA256 =~ command
 			<<RESPONSE
-SHA256 计算结果：#{Digest::SHA256.hexdigest($~[:src]).upcase}
+SHA256 计算结果：
+#{Digest::SHA256.hexdigest($~[:src]).upcase}
 RESPONSE
 		end
 	end
@@ -91,7 +100,8 @@ RESPONSE
 	def function_sha384(_, _, command, _)
 		if COMMAND_SHA384 =~ command
 			<<RESPONSE
-SHA384 计算结果：#{Digest::SHA384.hexdigest($~[:src]).upcase}
+SHA384 计算结果：
+#{Digest::SHA384.hexdigest($~[:src]).upcase}
 RESPONSE
 		end
 	end
@@ -100,7 +110,8 @@ RESPONSE
 	def function_sha512(_, _, command, _)
 		if COMMAND_SHA512 =~ command
 			<<RESPONSE
-SHA512 计算结果：#{Digest::SHA512.hexdigest($~[:src]).upcase}
+SHA512 计算结果：
+#{Digest::SHA512.hexdigest($~[:src]).upcase}
 RESPONSE
 		end
 	end

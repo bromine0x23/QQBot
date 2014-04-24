@@ -125,6 +125,7 @@ SQL
 	COMMAND_RELOAD_CONFIG   = '重载配置'
 	COMMAND_RELOAD_PLUGINS  = '重载插件'
 	COMMAND_START_GC        = '垃圾回收'
+	COMMAND_OBJECT_CHECK    = '检视对象'
 	COMMAND_START_DEBUG     = '开始调试'
 	COMMAND_STOP_DEBUG      = '结束调试'
 	COMMAND_END_DEBUG       = '结束调试'
@@ -186,6 +187,31 @@ SQL
 				GC.start
 				#noinspection RubyResolve
 				@responses[:gc_finished] % {gc_count: GC.count}
+			else
+				#noinspection RubyResolve
+				@responses[:no_permission] % {command: command}
+			end
+		end
+	end
+
+	def function_object_check(_, sender, command, _)
+		if COMMAND_OBJECT_CHECK == command
+			if qqbot.master?(sender)
+				result = ObjectSpace.count_objects
+				<<RESPONSE
+Ｔｏｔａｌ：　　#{result[:TOTAL]}
+Ｆｒｅｅ：　　　#{result[:FREE]}
+Ｏｂｊｅｃｔ：　#{result[:T_OBJECT]}
+Ｃｌａｓｓ：　　#{result[:T_CLASS]}
+Ｍｏｄｕｌｅ：　#{result[:T_MODULE]}
+Ｓｔｒｉｎｇ：　#{result[:T_STRING]}
+Ｒｅｘｅｘｐ：　#{result[:T_REGEXP]}
+Ａｒｒａｙ：　　#{result[:T_ARRAY]}
+Ｈａｓｈ：　　　#{result[:T_HASH]}
+Ｂｉｇｎｕｍ：　#{result[:T_BIGNUM]}
+Ｆｉｌｅ：　　　#{result[:T_FILE]}
+Ｍａｔｃｈ：　　#{result[:T_MATCH]}
+RESPONSE
 			else
 				#noinspection RubyResolve
 				@responses[:no_permission] % {command: command}

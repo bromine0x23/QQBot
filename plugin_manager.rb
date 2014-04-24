@@ -39,7 +39,7 @@ class PluginManager
 	end
 
 	def unload_plugins
-		exception_at = -1
+		exception_at = nil
 		@plugins.each_with_index do |plugin, index|
 			unless unload_plugin(plugin)
 				exception_at = index
@@ -47,7 +47,7 @@ class PluginManager
 			end
 		end
 
-		if exception_at == -1
+		if exception_at
 			recover_plugins(exception_at)
 			return false
 		end

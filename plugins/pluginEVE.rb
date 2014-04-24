@@ -23,6 +23,8 @@ EVE 空间站 <星系>
 MANUAL
 	PRIORITY = 0
 
+	COMMAND_HEADER = 'EVE'
+
 	COMMAND_MINERAL      = /^基础矿物$/
 	COMMAND_ITEM_INFO    = /^物品\s*(?<item_name>.+)/
 	COMMAND_STATION_INFO = /^空间站\s*(?<system_name>.+)/
@@ -78,10 +80,6 @@ SQL
 	def on_unload
 		super
 		@db.close
-	end
-
-	def command_header
-		'EVE'
 	end
 
 	#noinspection RubyResolve

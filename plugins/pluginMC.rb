@@ -11,6 +11,8 @@ MC 合成 <物品>
 MANUAL
 	PRIORITY = 0
 
+	COMMAND_HEADER = 'MC'
+
 	COMMAND_RECIPE = /^合成\s*(?<item_name>.+)/
 
 	#noinspection RubyResolve
@@ -20,10 +22,6 @@ MANUAL
 		@recipe = @data['recipe']
 		@alias .default_proc = proc { |hash, key| hash[key] = key }
 		@recipe.default_proc = proc { |hash, key| hash[key] = "不存在物品：#{key} 的合成公式" }
-	end
-
-	def command_header
-		'MC'
 	end
 
 	def function_recipe(_, _, command, _)

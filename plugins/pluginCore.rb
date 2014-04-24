@@ -139,7 +139,7 @@ SQL
 	def function_list_plugins(from, _, command, _)
 		if COMMAND_LIST_PLUGINS == command
 			header = "已启用插件：\n"
-			body = qqbot.plugins(from).map! { |plugin| "#{plugin.name}[#{plugin.author}<#{plugin.version}>]：#{plugin.description}" }.join("\n")
+			body = qqbot.plugins(from).map { |plugin| "#{plugin.name}[#{plugin.author}<#{plugin.version}>]：#{plugin.description}" }.join("\n")
 			#noinspection RubyResolve
 			header << (body.empty? ? @responses[:plugin_list_empty] : body)
 		end

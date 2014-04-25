@@ -30,7 +30,7 @@ class PluginAI < PluginNicknameResponderCombineFunctionBase
 MANUAL
 	PRIORITY = -8
 
-	DB_FILE = "#{PLUGIN_DIRECTORY}/pluginAI.db"
+	DB_FILE = file_path('pluginAI.db')
 
 	SQL_CREATE_TABLE_MESSAGES = <<SQL
 CREATE TABLE IF NOT EXISTS messages (

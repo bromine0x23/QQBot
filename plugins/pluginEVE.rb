@@ -40,7 +40,7 @@ MANUAL
 
 	PATTERN_THOUSAND_SEPARATOR = /(?<=\d)(?=(\d\d\d)+\.)/
 
-	DB_FILE = "#{PLUGIN_DIRECTORY}/pluginEVE.db"
+	DB_FILE = file_path('pluginEVE.db')
 
 	SQL_SELECT_ITEM_ID = <<SQL
 SELECT id FROM items WHERE name = ?
@@ -156,7 +156,7 @@ RESPONSE
 	end
 
 	#noinspection RubyResolve
-	def function_station_info(_, _, _, command, _)
+	def function_station_info(_, _, command, _)
 		if COMMAND_STATION_INFO =~ command
 			system_name = $~[:system_name]
 			result = @db.execute(SQL_SELECT_STATION_NAMES, system_name)
@@ -169,7 +169,7 @@ RESPONSE
 	end
 
 	#noinspection RubyResolve
-	def function_system_info(_, _, _, command, _)
+	def function_system_info(_, _, command, _)
 		if COMMAND_SYSTEM_INFO =~ command
 			system_name = $~[:system_name]
 			result = @db.get_first_row(SQL_SELECT_SYSTEM, system_name)

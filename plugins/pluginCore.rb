@@ -23,16 +23,16 @@ MANUAL
 	def on_load
 		super
 		load_filter_list
-		prepare_db
+		# prepare_db
 	end
 
 	def on_unload
 		super
 		save_filter_list
-		close_db
+		# close_db
 	end
 
-	FILTER_FILE = "#{PLUGIN_DIRECTORY}/pluginCore.filter"
+	FILTER_FILE = file_path('pluginCore.filter')
 
 	def load_filter_list
 		@filter = YAML.load_file(FILTER_FILE)
@@ -44,7 +44,7 @@ MANUAL
 		end
 	end
 
-	DB_FILE = "#{PLUGIN_DIRECTORY}/pluginCore.db"
+	DB_FILE = file_path('pluginCore.db')
 
 	SQL_CREATE_TABLE_MESSAGES = <<SQL
 CREATE TABLE IF NOT EXISTS messages (
@@ -90,7 +90,7 @@ SQL
 	def close_db
 		@db.close
 	end
-
+=begin
 	def on_message(sender, message, time)
 		@db.transaction do |db|
 			db.execute(SQL_INSERT_MESSAGE, sender.number, sender.name, message, time.to_i)
@@ -106,7 +106,7 @@ SQL
 		return true if @filter.include? sender.number
 		super
 	end
-
+=end
 	JSON_KEY_TYPE    = 'type'
 	JSON_KEY_ACCOUNT = 'account'
 	STRING_VERIFY_REQUIRED = 'verify_required'

@@ -1,7 +1,5 @@
-#!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
-require 'thread'
 require 'json'
 require 'logger'
 require 'uri'
@@ -51,7 +49,7 @@ module WebQQProtocol
 	HEADER_REFERER    = 'https://d.web2.qq.com/cfproxy.html?v=20110331002&callback=1'
 
 	# 网络通信辅助类
-	class NetHelper
+	class NetClient
 		KEY_COOKIE = 'Cookie'
 		KEY_SET_COOKIE = 'Set-Cookie'
 		DEFAULT_PATH = '/'
@@ -60,21 +58,15 @@ module WebQQProtocol
 
 		# Cookie处理辅助类
 		class Cookie
-			SEPARATOR = '; '
-			FORMAT = '%s=%s'
-
 			def initialize
 				@cookies = {}
 			end
 
 			# 更新Cookie
 			def update!(str)
-				@cookies.delete_if do |_, cookie|
-					cookie.expires and cookie.expires < Time.now
-				end
-				WEBrick::Cookie.parse_set_cookies(str).each do |cookie|
-					@cookies[cookie.name] = cookie if not cookie.expires or cookie.expires > Time.now
-				end
+				time = Time.now
+				@cookies.delete_if { |_, cookie| cookie.expires and cookie.expires < time }
+				WEBrick::Cookie.parse_set_cookies(str).each { |cookie| @cookies[cookie.name] = cookie if not cookie.expires or cookie.expires > time }
 			end
 
 			def [](key)
@@ -82,7 +74,7 @@ module WebQQProtocol
 			end
 
 			def to_s
-				@cookies.values.map{|cookie| "#{cookie.name}=#{cookie.value}"}.join(SEPARATOR)
+				@cookies.map{|_, cookie| "#{cookie.name}=#{cookie.value}"}.join('; ')
 			end
 		end
 
@@ -104,8 +96,8 @@ module WebQQProtocol
 			Net::HTTP.start(uri.host, uri.port, read_timeout: 10, use_ssl: uri.scheme == SCHEME_HTTPS, verify_mode: OpenSSL::SSL::VERIFY_NONE) do |http|
 				@header[KEY_COOKIE] = @cookies.to_s
 				response = http.request(Net::HTTP::Get.new(uri, @header))
-				@cookies.update!(response[KEY_SET_COOKIE]) if response[KEY_SET_COOKIE]
 				log("BODY: #{response.body.strip}", Logger::DEBUG) if $-d
+				@cookies.update!(response[KEY_SET_COOKIE]) if response[KEY_SET_COOKIE]
 				return response.body
 			end
 		end
@@ -116,8 +108,8 @@ module WebQQProtocol
 			Net::HTTP.start(uri.host, uri.port, read_timeout: 10, use_ssl: uri.scheme == SCHEME_HTTPS, verify_mode: OpenSSL::SSL::VERIFY_NONE) do |http|
 				@header[KEY_COOKIE] = @cookies.to_s
 				response = http.request(Net::HTTP::Post.new(uri, @header), data)
-				@cookies.update!(response[KEY_SET_COOKIE]) if response[KEY_SET_COOKIE]
 				log("BODY: #{response.body.strip}", Logger::DEBUG) if $-d
+				@cookies.update!(response[KEY_SET_COOKIE]) if response[KEY_SET_COOKIE]
 				return response.body
 			end
 		end
@@ -160,7 +152,7 @@ module WebQQProtocol
 	end
 
 	# 哈希算法
-	module Hasher
+	module Encrypt
 		# 密码加密
 		def self.encrypt_password(password, verify_code, key)
 			md5(md5(hex2ascii(md5(password) + key.gsub!(/\\x/, ''))) + verify_code)
@@ -211,9 +203,9 @@ module WebQQProtocol
 			@logger = logger
 			@messages= Queue.new
 			@thread = Thread.new do
+				log('线程启动……', Logger::DEBUG)
 				redo_count = 0
 				begin
-					log('线程启动……', Logger::DEBUG) if $-d
 					http = Net::HTTP.start(HOST_D_WEB2_QQ, read_timeout: TIMEOUT)
 					request = Net::HTTP::Post.new(
 						'/channel/poll2',
@@ -222,7 +214,7 @@ module WebQQProtocol
 						HEADER_KEY_COOKIE => cookies
 					)
 					request.set_form_data(
-						r: JSON.generate(clientid: client_id, psessionid: p_session_id, key: 0, ids: []),
+						r: JSON.fast_generate(clientid: client_id, psessionid: p_session_id, key: 0, ids: []),
 						clientid: client_id,
 						psessionid: p_session_id
 					)
@@ -237,10 +229,10 @@ module WebQQProtocol
 								next
 							when 103, 108, 114, 120, 121
 								log("poll时遭遇错误代码：#{ex.error_code}", Logger::ERROR)
-								raise
+								raise ex
 							else
 								log("poll时遭遇未知代码：#{ex.error_code}", Logger::FATAL)
-								raise
+								raise ex
 							end
 						end
 					end
@@ -253,7 +245,7 @@ LOG
 					redo_count += 1
 					if redo_count > REDO_LIMIT
 						log("重试超过#{REDO_LIMIT}次，退出", Logger::FATAL)
-						raise
+						raise ex
 					end
 					log('重试', Logger::ERROR)
 					redo
@@ -283,22 +275,26 @@ LOG
 		attr_reader :thread
 
 		# 创建发送线程
-		def initialize(client_id1, p_session_id1, cookies, logger)
+		def initialize(out_client_id, out_p_session_id, cookies, logger)
 			@logger = logger
 			@messages= Queue.new
-			@thread = Thread.new(client_id1, p_session_id1) do |client_id, p_session_id|
+			@thread = Thread.new(
+				out_client_id,
+				out_p_session_id,
+				HEADER_KEY_USER_AGENT => HEADER_USER_AGENT,
+				HEADER_KEY_REFERER => HEADER_REFERER,
+				HEADER_KEY_COOKIE => cookies
+			) do |client_id, p_session_id, init_header|
+				log('线程启动……', Logger::DEBUG)
 				redo_count = 0
 				begin
-					log('线程启动……', Logger::DEBUG) if $-d
 					#noinspection RubyResolve
 					https = Net::HTTP.start(HOST_D_WEB2_QQ, 443, use_ssl: true, verify_mode: OpenSSL::SSL::VERIFY_NONE)
-					init_header = {
-						HEADER_KEY_USER_AGENT => HEADER_USER_AGENT,
-						HEADER_KEY_REFERER => HEADER_REFERER,
-						HEADER_KEY_COOKIE => cookies
-					}
-					qun_request   = Net::HTTP::Post.new('/channel/send_qun_msg2', init_header)
-					qun_raw_data = {
+					request_buddy = Net::HTTP::Post.new('/channel/send_buddy_msg2', init_header)
+					request_qun   = Net::HTTP::Post.new('/channel/send_qun_msg2', init_header)
+					message_counter = Random.rand(1000...10000) * 10000
+					raw_data = {
+						to: nil,
 						group_uin: nil,
 						content: nil,
 						msg_id: nil,
@@ -310,39 +306,34 @@ LOG
 						clientid: client_id,
 						psessionid: p_session_id
 					}
-					buddy_request = Net::HTTP::Post.new('/channel/send_buddy_msg2', init_header)
-					buddy_raw_data = {
-						to: nil,
-						face: 0,
-						content: nil,
-						msg_id: nil,
-						clientid: client_id,
-						psessionid: p_session_id
-					}
-					message_counter = Random.rand(1000...10000) * 10000
 					loop do
-						data = @messages.pop
+						message = @messages.pop
 						begin
-							case data[:type]
+							case message[:type]
 							when :group_message
-								message_counter += 1
-								qun_raw_data[:group_uin] = data[:uin]
-								qun_raw_data[:content]   = encode_content(data[:message], data[:font])
-								qun_raw_data[:msg_id]    = message_counter
-								data[:r] = JSON.fast_generate(qun_raw_data)
-								qun_request.set_form_data(data)
-								post(https, qun_request)
+								raw_data[:group_uin] = message[:uin]
+								request = request_qun
 							when :message
-								message_counter += 1
-								buddy_raw_data[:to]      = data[:uin]
-								buddy_raw_data[:content] = encode_content(data[:message], data[:font])
-								buddy_raw_data[:msg_id]  = message_counter
-								data[:r] = JSON.fast_generate(buddy_raw_data)
-								buddy_request.set_form_data(data)
-								post(https, buddy_request)
+								raw_data[:to] = message[:uin]
+								request = request_buddy
 							else
 								next
 							end
+
+							message_counter += 1
+
+							raw_data[:content] = encode_content(message[:message], message[:font])
+							raw_data[:msg_id]  = message_counter
+
+							data[:r] = JSON.fast_generate(raw_data)
+
+							request.set_form_data(data)
+							log("HTTP POST：#{request.path} BODY：#{request.body}", Logger::DEBUG) if $-d
+
+							json_data = JSON.parse(https.request(request).body)
+							log("RESPONSE：#{json_data}", Logger::DEBUG) if $-d
+
+							raise ErrorCode.new(json_data[JSON_KEY_RETCODE], json_data) unless json_data[JSON_KEY_RETCODE] == 0
 						rescue EOFError
 							log('网络异常，无法发送消息，重试……', Logger::ERROR)
 							retry
@@ -357,7 +348,7 @@ LOG
 					redo_count += 1
 					if redo_count > REDO_LIMIT
 						log("重试超过#{REDO_LIMIT}次，退出", Logger::FATAL)
-						raise
+						raise ex
 					end
 					log('重试', Logger::ERROR)
 					redo
@@ -393,16 +384,6 @@ LOG
 			@logger.log(level, message, self.class.name)
 		end
 
-		def post(https, request)
-			log(<<LOG.strip, Logger::DEBUG) if $-d
-HTTP POST：#{request.path}
-　BODY：#{request.body}
-LOG
-			json_data = JSON.parse(https.request(request).body)
-			log("RESPONSE：#{json_data}", Logger::DEBUG) if $-d
-			raise ErrorCode.new(json_data[JSON_KEY_RETCODE], json_data) unless json_data[JSON_KEY_RETCODE] == 0
-		end
-
 		# 编码内容数据
 		def encode_content(message, font)
 			JSON.fast_generate(
@@ -436,58 +417,41 @@ LOG
 			@uin    = uin
 			@number = number
 			@name   = name
-
 		end
 
 		def to_s
-			"#{self.class::TYPE}#{@name}(#{@number})"
+			"#{self.class::TYPE} #{@name}(#{@number})"
 		end
 	end
 
 	# QQ好友类
 	class QQFriend < QQEntity
 		TYPE = 'QQ好友'
-
-		def initialize(uin, number, name = nil)
-			super
-		end
 	end
 
 	class QQGroupMember < QQEntity
 		TYPE = 'QQ群成员'
-
-		def initialize(uin, number, name = nil)
-			super
-		end
 	end
 
 	# QQ群类
 	class QQGroup < QQEntity
 		TYPE = 'QQ群'
 
-		attr_reader :code, :info, :members
+		attr_reader :code, :members
 
-		# @param [WebQQProtocol] client
+		# @param [WebQQProtocol::Client] client
 		def initialize(client, group)
-			@client = client
 			@code = group[JSON_KEY_CODE]
-			super(group[JSON_KEY_GID], @client.fetch_group_number(@code), group[JSON_KEY_NAME])
-			@info = @client.fetch_group_info(@code)
-			@members = {}
-			@member_names = {}
-			@info[JSON_KEY_MINFO].each do |member|
-				@member_names[member[JSON_KEY_UIN]] = member[JSON_KEY_NICK]
-			end
-			if @info[JSON_KEY_CARDS]
-				@info[JSON_KEY_CARDS].each do |card|
-					@member_names[card[JSON_KEY_MUIN]] = card[JSON_KEY_CARD]
-				end
-			end
+			super(group[JSON_KEY_GID], client.fetch_group_number(@code), group[JSON_KEY_NAME])
+			info = client.fetch_group_info(@code)
+			member_names = Hash[info[JSON_KEY_MINFO].map!{ |minfo| [minfo[JSON_KEY_UIN], minfo[JSON_KEY_NICK]] }]
+			member_names.merge!(Hash[info[JSON_KEY_CARDS].map!{ |card| [card[JSON_KEY_MUIN], card[JSON_KEY_CARD]] }]) if info[JSON_KEY_CARDS]
+			@members = Hash.new{ |hash, key| hash[key] = QQGroupMember.new(key, client.fetch_qq_number(key), member_names[key]) }
 		end
 
+		# @return [WebQQProtocol::QQGroupMember]
 		def member(uin)
-			return @members[uin] if @members.has_key? uin
-			@members[uin] = QQGroupMember.new(uin, @client.fetch_qq_number(uin), @member_names[uin])
+			@members[uin]
 		end
 	end
 
@@ -520,7 +484,7 @@ LOG
 		attr_reader :receiver, :sender
 		attr_reader :groups, :friends
 
-		def initialize(qq, nickname, client_id, random_key, ptwebqq, p_session_id, uin, verify_webqq, net_helper, logger)
+		def initialize(qq, nickname, client_id, random_key, ptwebqq, p_session_id, uin, verify_webqq, net_client, logger)
 			@qq = qq
 			@nickname = nickname
 			@client_id = client_id
@@ -529,48 +493,32 @@ LOG
 			@p_session_id = p_session_id
 			@uin = uin
 			@ptwebqq = ptwebqq
-			@net_helper = net_helper
+			@net_client = net_client
 
-			@receiver = MessageReceiver.new(@client_id, @p_session_id, @net_helper.cookies.to_s, logger)
-			@sender = MessageSender.new(@client_id, @p_session_id, @net_helper.cookies.to_s, logger)
+			@receiver = MessageReceiver.new(@client_id, @p_session_id, @net_client.cookies.to_s, logger)
+			@sender   = MessageSender.new(@client_id, @p_session_id, @net_client.cookies.to_s, logger)
 
-			json_data = fetch_groups
-			@group_list = {}
-			json_data[JSON_KEY_GNAMELIST].each do |group|
-				@group_list[group[JSON_KEY_GID]] = group
-			end
+			group_list = Hash[fetch_groups[JSON_KEY_GNAMELIST].map!{ |gname| [gname[JSON_KEY_GID], gname] }]
+			@groups = Hash.new{ |hash, key| hash[key] = QQGroup.new(self, group_list[key]) }
 
 			json_data = fetch_friends
-			@friend_list = {}
-			friend_marknames = json_data[JSON_KEY_MARKNAMES]
-			friend_infos = json_data[JSON_KEY_INFO]
-			json_data[JSON_KEY_FRIENDS].each do |friend|
-				uin = friend[JSON_KEY_UIN]
-				markname = friend_marknames.find{|markname| markname[JSON_KEY_UIN] == uin }
-				name = if markname
-						   markname[JSON_KEY_MARKNAME]
-					   else
-						   friend_infos.find{ |info| info[JSON_KEY_UIN] == uin }[JSON_KEY_NICK]
-					   end
-				@friend_list[uin] = name
-			end
-
-			@groups = {}
-			@friends = {}
+			friend_list = Hash[json_data[JSON_KEY_MARKNAMES].map!{|markname| [markname[JSON_KEY_UIN], markname[JSON_KEY_MARKNAME]] }].merge!(Hash[json_data[JSON_KEY_INFO].map!{|info| [info[JSON_KEY_UIN], info[JSON_KEY_NICK]]}])
+			@friends = Hash.new{ |hash, key| hash[key] = QQFriend.new(key, fetch_qq_number(key), friend_list[key]) }
 		end
 
+		# @return [WebQQProtocol::QQGroup]
 		def group(uin)
-			return @groups[uin] if @groups.has_key? uin
-			@groups[uin] = QQGroup.new(self, @group_list[uin]) if @group_list.has_key? uin
+			@groups[uin]
 		end
 
+		# @return [WebQQProtocol::QQFriend]
 		def friend(uin)
-			return @friends[uin] if @friends.has_key? uin
-			@friends[uin] = QQFriend.new(uin, fetch_qq_number(uin), @friend_list[uin]) if @friend_list.has_key? uin
+			@friends[uin]
 		end
 
+		# @return [WebQQProtocol::QQEntity]
 		def entity(uin)
-			@groups[uin] || @friends[uin]
+			group(uin) || friend(uin)
 		end
 
 		# 添加好友
@@ -603,14 +551,14 @@ LOG
 				clientid: @client_id,
 				psessionid: @p_session_id
 			)
-			json_data = JSON.parse(@net_helper.post(uri, data))
+			json_data = JSON.parse(@net_client.post(uri, data))
 			raise ErrorCode.new(json_data[JSON_KEY_RETCODE], json_data) unless json_data[JSON_KEY_RETCODE] == 0
 			json_data[JSON_KEY_RESULT]
 		end
 
 		# HTTP GET 请求，返回解析后的 json 数据的 result 键对应的值
 		def get_request(uri)
-			json_data = JSON.parse(@net_helper.get(uri))
+			json_data = JSON.parse(@net_client.get(uri))
 			raise ErrorCode.new(json_data[JSON_KEY_RETCODE], json_data) unless json_data[JSON_KEY_RETCODE] == 0
 			json_data[JSON_KEY_RESULT]
 		end
@@ -642,9 +590,9 @@ LOG
 =end
 		def fetch_friends
 			post_request(
-				JSON.generate(
+				JSON.fast_generate(
 					h: GET_FRIENDS_HELLO_MESSAGE,
-					hash: Hasher.hash_friends(@uin, @ptwebqq),
+					hash: Encrypt.hash_friends(@uin, @ptwebqq),
 					vfwebqq: @verify_webqq
 				),
 				URI_GET_USER_FRIENDS2
@@ -767,7 +715,7 @@ LOG
 { "result1": 0, "account": "10000" ,  "tuin": "uin", "stat": 10 }
 =end
 		def allow_add_friend(account)
-			raw_data = JSON.generate(
+			raw_data = JSON.fast_generate(
 				account: account,
 				gid: 0,
 				mname: '',
@@ -784,7 +732,7 @@ LOG
 		client_id  = Random.rand(10000000...100000000) # 客户端id
 		random_key = Random.rand
 
-		net_helper = NetHelper.new(logger)
+		net_helper = NetClient.new(logger)
 		net_helper.add_header(HEADER_KEY_USER_AGENT, HEADER_USER_AGENT)
 
 		ptwebqq = nil
@@ -831,7 +779,7 @@ LOG
 
 			#加密密码
 			log(logger, '加密密码……', Logger::DEBUG) if $-d
-			password_encrypted = Hasher.encrypt_password(password, verify_code, key)
+			password_encrypted = Encrypt.encrypt_password(password, verify_code, key)
 			log(logger, "密码加密为：#{password_encrypted}", Logger::DEBUG) if $-d
 
 			# 验证账号
@@ -884,7 +832,7 @@ LOG
 				net_helper.post(
 					URI('https://d.web2.qq.com/channel/login2'),
 					URI.encode_www_form(
-						r: JSON.fast_generate(
+						r: JSON.generate(
 							status: 'online',
 							ptwebqq: ptwebqq,
 							passwd_sig: '',

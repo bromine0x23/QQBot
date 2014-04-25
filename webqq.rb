@@ -229,10 +229,10 @@ module WebQQProtocol
 								next
 							when 103, 108, 114, 120, 121
 								log("poll时遭遇错误代码：#{ex.error_code}", Logger::ERROR)
-								raise ex
+								raise
 							else
 								log("poll时遭遇未知代码：#{ex.error_code}", Logger::FATAL)
-								raise ex
+								raise
 							end
 						end
 					end
@@ -245,7 +245,7 @@ LOG
 					redo_count += 1
 					if redo_count > REDO_LIMIT
 						log("重试超过#{REDO_LIMIT}次，退出", Logger::FATAL)
-						raise ex
+						raise
 					end
 					log('重试', Logger::ERROR)
 					redo
@@ -348,7 +348,7 @@ LOG
 					redo_count += 1
 					if redo_count > REDO_LIMIT
 						log("重试超过#{REDO_LIMIT}次，退出", Logger::FATAL)
-						raise ex
+						raise
 					end
 					log('重试', Logger::ERROR)
 					redo
@@ -457,29 +457,6 @@ LOG
 
 	#noinspection RubyTooManyInstanceVariablesInspection
 	class Client
-		GET_FRIENDS_HELLO_MESSAGE = 'hello'
-
-		PATH_LOGOUT2 = '/channel/logout2'
-		PATH_GET_GROUP_NAME_LIST_MASK2 = '/api/get_group_name_list_mask2'
-		PATH_GET_USER_FRIENDS2 = '/api/get_user_friends2'
-		PATH_GET_FRIEND_UIN2 = '/api/get_friend_uin2'
-		PATH_GET_FRIEND_INFO2 = '/api/get_friend_info2'
-		PATH_GET_GROUP_INFO_EXT2 = '/api/get_group_info_ext2'
-		PATH_ALLOW_AND_ADD2 = '/api/allow_and_add2'
-
-		URI_GET_GROUP_NAME_LIST_MASK2 = URI::HTTP.build(
-			host: HOST_S_WEB2_QQ,
-			path: PATH_GET_GROUP_NAME_LIST_MASK2
-		)
-		URI_GET_USER_FRIENDS2 = URI::HTTP.build(
-			host: HOST_S_WEB2_QQ,
-			path: PATH_GET_USER_FRIENDS2
-		)
-		URI_ALLOW_AND_ADD2 = URI::HTTP.build(
-			host: HOST_S_WEB2_QQ,
-			path: PATH_ALLOW_AND_ADD2
-		)
-
 		attr_reader :qq, :nickname
 		attr_reader :receiver, :sender
 		attr_reader :groups, :friends
@@ -494,6 +471,7 @@ LOG
 			@uin = uin
 			@ptwebqq = ptwebqq
 			@net_client = net_client
+			@logger = logger
 
 			@receiver = MessageReceiver.new(@client_id, @p_session_id, @net_client.cookies.to_s, logger)
 			@sender   = MessageSender.new(@client_id, @p_session_id, @net_client.cookies.to_s, logger)
@@ -504,6 +482,8 @@ LOG
 			json_data = fetch_friends
 			friend_list = Hash[json_data[JSON_KEY_MARKNAMES].map!{|markname| [markname[JSON_KEY_UIN], markname[JSON_KEY_MARKNAME]] }].merge!(Hash[json_data[JSON_KEY_INFO].map!{|info| [info[JSON_KEY_UIN], info[JSON_KEY_NICK]]}])
 			@friends = Hash.new{ |hash, key| hash[key] = QQFriend.new(key, fetch_qq_number(key), friend_list[key]) }
+
+			log('客户端建立成功')
 		end
 
 		# @return [WebQQProtocol::QQGroup]
@@ -528,6 +508,7 @@ LOG
 			@friends[uin] = QQFriend.new(uin, json_data[JSON_KEY_ACCOUNT], fetch_friend_info(uin)[JSON_KEY_NICK])
 		end
 
+		PATH_LOGOUT2 = '/channel/logout2'
 		# 登出
 		def logout
 			uri = URI::HTTPS.build(
@@ -545,7 +526,7 @@ LOG
 		end
 
 		# HTTP POST 请求，返回解析后的 json 数据的 result 键对应的值
-		def post_request(raw_data, uri)
+		def post_request(uri, raw_data)
 			data = URI.encode_www_form(
 				r: raw_data,
 				clientid: @client_id,
@@ -563,6 +544,11 @@ LOG
 			json_data[JSON_KEY_RESULT]
 		end
 
+		URI_GET_GROUP_NAME_LIST_MASK2 = URI::HTTP.build(
+			host: HOST_S_WEB2_QQ,
+			path: '/api/get_group_name_list_mask2'
+		)
+		def fetch_groups
 		# 获取群信息
 =begin
 {
@@ -571,11 +557,15 @@ LOG
     "gnamelist": [ { "flag": 0, "name": "", "gid": 0, "code": 0 }, ...... ]
 }
 =end
-		def fetch_groups
-			post_request(JSON.fast_generate(vfwebqq: @verify_webqq), URI_GET_GROUP_NAME_LIST_MASK2)
+			post_request(URI_GET_GROUP_NAME_LIST_MASK2, JSON.fast_generate(vfwebqq: @verify_webqq))
 		end
 
+		URI_GET_USER_FRIENDS2 = URI::HTTP.build(
+			host: HOST_S_WEB2_QQ,
+			path: '/api/get_user_friends2'
+		)
 		# 获取好友信息
+		def fetch_friends
 =begin
 {
 	# 分组信息
@@ -588,22 +578,22 @@ LOG
 	"info": [ { "face": 0, "flag": 0, "nick": "", "uin": 0 }, ...... ]
 }
 =end
-		def fetch_friends
 			post_request(
+				URI_GET_USER_FRIENDS2,
 				JSON.fast_generate(
-					h: GET_FRIENDS_HELLO_MESSAGE,
+					h: 'hello',
 					hash: Encrypt.hash_friends(@uin, @ptwebqq),
 					vfwebqq: @verify_webqq
-				),
-				URI_GET_USER_FRIENDS2
+				)
 			)
 		end
 
+		PATH_GET_FRIEND_UIN2 = '/api/get_friend_uin2'
 		# 通过 uin 获取 QQ 号
+		def fetch_qq_number(uin)
 =begin
 { "uiuin": "", "account": 0, "uin": 0 }
 =end
-		def fetch_qq_number(uin)
 			uri = URI::HTTP.build(
 				host: HOST_S_WEB2_QQ,
 				path: PATH_GET_FRIEND_UIN2,
@@ -620,10 +610,10 @@ LOG
 		end
 
 		# 通过 uin 获取群号
+		def fetch_group_number(uin)
 =begin
 { "uiuin": "", "account": 0, "uin": 0 }
 =end
-		def fetch_group_number(uin)
 			uri = URI::HTTP.build(
 				host: HOST_S_WEB2_QQ,
 				path: PATH_GET_FRIEND_UIN2,
@@ -639,7 +629,9 @@ LOG
 			get_request(uri)[JSON_KEY_ACCOUNT]
 		end
 
+		PATH_GET_FRIEND_INFO2 = '/api/get_friend_info2'
 		# 通过 uin 获取好友信息
+		def fetch_friend_info(uin)
 =begin
 {
 	"face": 0,
@@ -666,7 +658,6 @@ LOG
 	"mobile": ""
 }
 =end
-		def fetch_friend_info(uin)
 			uri = URI::HTTP.build(
 				host: HOST_S_WEB2_QQ,
 				path: PATH_GET_FRIEND_INFO2,
@@ -681,7 +672,9 @@ LOG
 			get_request(uri)
 		end
 
+		PATH_GET_GROUP_INFO_EXT2 = '/api/get_group_info_ext2'
 		# 通过 uin 获取群信息
+		def fetch_group_info(group_code)
 =begin
 {
 	# 在线成员列表
@@ -697,7 +690,6 @@ LOG
 	"cards":[ { "muin":, "card":"XXX" }, ...... ]
 }
 =end
-		def fetch_group_info(group_code)
 			uri = URI::HTTP.build(
 				host: HOST_S_WEB2_QQ,
 				path: PATH_GET_GROUP_INFO_EXT2,
@@ -710,18 +702,28 @@ LOG
 			get_request(uri)
 		end
 
+		URI_ALLOW_AND_ADD2 = URI::HTTP.build(
+			host: HOST_S_WEB2_QQ,
+			path: '/api/allow_and_add2'
+		)
+		def allow_add_friend(account)
 		# 同意添加好友
 =begin
 { "result1": 0, "account": "10000" ,  "tuin": "uin", "stat": 10 }
 =end
-		def allow_add_friend(account)
 			raw_data = JSON.fast_generate(
 				account: account,
 				gid: 0,
 				mname: '',
 				vfwebqq: @verify_webqq
 			)
-			post_request(raw_data, URI_ALLOW_AND_ADD2)
+			post_request(URI_ALLOW_AND_ADD2, raw_data)
+		end
+
+		private
+
+		def log(message, level = Logger::INFO)
+			@logger.log(level, message, self.class.name)
 		end
 	end
 
@@ -848,7 +850,6 @@ LOG
 			p_session_id = session_data[JSON_KEY_PSESSIONID]
 			uin = session_data[JSON_KEY_UIN]
 			verify_webqq = session_data[JSON_KEY_VFWEBQQ]
-			log(logger, '登陆成功', Logger::DEBUG) if $-d
 		rescue LoginFailed => ex
 			case ex.state
 			when 3
@@ -865,6 +866,8 @@ LOG
 				raise
 			end
 		end
+
+		log(logger, '登陆成功')
 
 		Client.new(qq, nickname, client_id, random_key, ptwebqq, p_session_id, uin, verify_webqq, net_helper, logger)
 	end

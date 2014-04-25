@@ -79,16 +79,16 @@ MANUAL
 		file_name[0] = file_name[0].downcase
 
 		config_file = "#{PLUGIN_DIRECTORY}/#{file_name}.config"
-
-		if File.exist? config_file
-			YAML.load_file(config_file).each_pair { |key, value| instance_variable_set(:"@#{key}", value) }
-		end
+		YAML.load_file(config_file).each_pair { |key, value| instance_variable_set(:"@#{key}", value) } if File.exist? config_file
 
 		data_file = "#{PLUGIN_DIRECTORY}/#{file_name}.data"
 		@data = YAML.load_file(data_file) if File.exist? data_file
+
+		log('载入完毕')
 	end
 
 	def on_unload
+		log('卸载完毕')
 		# 桩方法
 	end
 
@@ -103,8 +103,8 @@ MANUAL
 		@logger.log(level, message, self.class.name)
 	end
 
-	def self.file_path(source_path, file_name)
-		File.expand_path "#{File.dirname(source_path)}/#{file_name}"
+	def self.file_path(file_name)
+		File.expand_path "#{PLUGIN_DIRECTORY}/#{file_name}"
 	end
 
 	private
@@ -122,25 +122,36 @@ end
 class PluginResponderBase < PluginBase
 	NAME = '消息回应插件基类'
 
-	def initialize(qqbot, logger)
-		super
-		@send_message = @qqbot.method(:send_message)
-		@send_group_message = @qqbot.method(:send_group_message)
-	end
-
 	# @param [WebQQProtocol::QQFriend] sender
-	# @param [content] content
+	# @param [String] message
 	# @param [Time] time
-	def on_message(sender, content, time)
-		# 桩方法，处理事件响应
+	def on_message(sender, message, time)
+		response = deal_message(sender, message, time)
+		@qqbot.send_message(sender, response) if response
 	end
 
 	# @param [WebQQProtocol::QQGroup] from
 	# @param [WebQQProtocol::QQGroupMember] sender
-	# @param [content] content
+	# @param [String] message
 	# @param [Time] time
-	def on_group_message(from, sender, content, time)
-		# 桩方法，处理群事件响应
+	def on_group_message(from, sender, message, time)
+		response = deal_group_message(from, sender, message, time)
+		@qqbot.send_group_message(from, response) if response
+	end
+
+	# @param [WebQQProtocol::QQFriend] sender
+	# @param [String] message
+	# @param [Time] time
+	def deal_message(sender, message, time)
+		# 桩方法，好友消息响应
+	end
+
+	# @param [WebQQProtocol::QQGroup] from
+	# @param [WebQQProtocol::QQGroupMember] sender
+	# @param [String] message
+	# @param [Time] time
+	def deal_group_message(from, sender, message, time)
+		# 桩方法，处理群消息响应
 	end
 end
 
@@ -153,30 +164,20 @@ class PluginNicknameResponderBase < PluginResponderBase
 	end
 
 	# @param [WebQQProtocol::QQFriend] sender
-	# @param [content] content
+	# @param [String] message
 	# @param [Time] time
-	def on_message(sender, content, time)
-		response_or_ignore(sender, sender, QQBot.message(content), time, @send_message)
+	def deal_message(sender, message, time)
+		get_response(sender, sender, message, time)
 	end
 
 	# @param [WebQQProtocol::QQGroup] from
 	# @param [WebQQProtocol::QQGroupMember] sender
-	# @param [content] content
+	# @param [String] message
 	# @param [Time] time
-	def on_group_message(from, sender, content, time)
-		if /^\s*@?#{qqbot_name}(?<message>.*)/ =~ QQBot.message(content)
-			response_or_ignore(from, sender, $~[:message].strip, time, @send_group_message)
+	def deal_group_message(from, sender, message, time)
+		if /^@?#{qqbot_name}\s*(?<message>.*)/ =~ message
+			get_response(from, sender, $~[:message], time)
 		end
-	end
-
-	# @param [WebQQProtocol::QQEntity] from
-	# @param [WebQQProtocol::QQEntity] sender
-	# @param [String] command
-	# @param [Time] time
-	# @param [Method] call_back
-	def response_or_ignore(from, sender, command, time, call_back)
-		response = get_response(from, sender, command, time)
-		call_back.call(from, response) if response
 	end
 
 	# @param [WebQQProtocol::QQEntity] from
@@ -210,7 +211,7 @@ class PluginNicknameResponderCombineFunctionBase < PluginNicknameResponderBase
 	end
 
 	# @return [Array[Symbol]]
-	def fuctions
+	def functions
 		@fuctions ||= methods.select! {|method_name| /^function_/ =~ method_name}
 	end
 
@@ -218,7 +219,7 @@ class PluginNicknameResponderCombineFunctionBase < PluginNicknameResponderBase
 		if command_pattern =~ command
 			command = $~[:command]
 			response = nil
-			fuctions.each do |function|
+			functions.each do |function|
 				response = send(function, from, sender, command, time)
 				break if response
 			end

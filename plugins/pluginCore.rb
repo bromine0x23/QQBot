@@ -91,17 +91,17 @@ SQL
 		@db.close
 	end
 
-	def on_message(sender, content, time)
+	def on_message(sender, message, time)
 		@db.transaction do |db|
-			db.execute(SQL_INSERT_MESSAGE, sender.number, sender.name, QQBot.message(content), time.to_i)
+			db.execute(SQL_INSERT_MESSAGE, sender.number, sender.name, message, time.to_i)
 		end
 		return true if @filter.include? sender.number
 		super
 	end
 
-	def on_group_message(from, sender, content, time)
+	def on_group_message(from, sender, message, time)
 		@db.transaction do |db|
-			db.execute(SQL_INSERT_GROUP_MESSAGE, from.number, from.name, sender.number, sender.name, QQBot.message(content), time.to_i)
+			db.execute(SQL_INSERT_GROUP_MESSAGE, from.number, from.name, sender.number, sender.name, message, time.to_i)
 		end
 		return true if @filter.include? sender.number
 		super
@@ -122,13 +122,11 @@ SQL
 
 	COMMAND_LIST_PLUGINS    = '插件列表'
 	COMMAND_LIST_PRIORITIES = '插件优先级'
-	COMMAND_RELOAD_CONFIG   = '重载配置'
 	COMMAND_RELOAD_PLUGINS  = '重载插件'
 	COMMAND_START_GC        = '垃圾回收'
 	COMMAND_OBJECT_CHECK    = '检视对象'
 	COMMAND_START_DEBUG     = '开始调试'
 	COMMAND_STOP_DEBUG      = '结束调试'
-	COMMAND_END_DEBUG       = '结束调试'
 	COMMAND_FILTER_LIST     = '屏蔽列表'
 	COMMAND_FILTER_ADD      = /^屏蔽\s*(?<number>\d+)/
 	COMMAND_FILTER_REMOVE   = /^(停止|取消)屏蔽\s*(?<number>\d+)/
@@ -148,19 +146,6 @@ SQL
 	def function_list_priorities(from, _, command, _)
 		if COMMAND_LIST_PRIORITIES == command
 			qqbot.plugins(from).map { |plugin| "#{plugin.name} => #{plugin.priority}" }.join("\n")
-		end
-	end
-
-	def function_reload_config(_, sender, command, _)
-		if COMMAND_RELOAD_CONFIG == command
-			if qqbot.master?(sender)
-				qqbot.load_config
-				#noinspection RubyResolve
-				@responses[:config_reloaded]
-			else
-				#noinspection RubyResolve
-				@responses[:no_permission] % {command: command}
-			end
 		end
 	end
 

@@ -46,12 +46,11 @@ class QQBot
 			puts '登录失败'
 			raise
 		end
+		puts '登录成功！'
 		@message_receiver = @client.receiver
-		@message_sender = @client.sender
+		@message_sender   = @client.sender
 		load_plugins
 		begin
-			log('登录成功！')
-			puts 'QQBot已成功登录！'
 			loop do
 				datas = @message_receiver.data
 				log("data => #{datas}") if $-d

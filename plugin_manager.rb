@@ -34,7 +34,7 @@ class PluginManager
 		registry_plugins
 		sort_plugin_list
 		load_rules
-		log('插件载入完毕', Logger::DEBUG) if $-d
+		log('插件载入完毕')
 		true
 	end
 
@@ -53,7 +53,7 @@ class PluginManager
 		end
 
 		remove_plugin_classes
-		log('插件卸载完毕', Logger::DEBUG) if $-d
+		log('插件卸载完毕')
 		true
 	end
 
@@ -61,7 +61,7 @@ class PluginManager
 	def reload_plugins
 		return -1 unless unload_plugins
 		load_plugins
-		log('插件重载完毕', Logger::DEBUG) if $-d
+		log('插件重载完毕')
 		@plugins.size
 	end
 
@@ -193,11 +193,11 @@ LOG
 
 	def on_message(value)
 		sender = @qqbot.friend(value[KEY_FROM_UIN])
-		content = value[KEY_CONTENT]
+		message = QQBot.message(value[KEY_CONTENT])
 		time = Time.at(value[KEY_TIME])
 		@message_plugins.each do |plugin|
 			begin
-				return if plugin.on_message(sender, content, time)
+				return if plugin.on_message(sender, message, time)
 			rescue Exception => ex
 				log(<<LOG, Logger::ERROR)
 执行插件 #{plugin.name} 时发生异常：#{ex}
@@ -211,12 +211,12 @@ LOG
 	def on_group_message(value)
 		from = @qqbot.group(value[KEY_FROM_UIN])
 		sender = from.member(value[KEY_SEND_UIN])
-		content = value[KEY_CONTENT]
+		message = QQBot.message(value[KEY_CONTENT])
 		time = Time.at(value[KEY_TIME])
 		@group_message_plugins.each do |plugin|
 			next if forbidden?(plugin.class.name, from)
 			begin
-				return if plugin.on_group_message(from, sender, content, time)
+				return if plugin.on_group_message(from, sender, message, time)
 			rescue Exception => ex
 				log(<<LOG, Logger::ERROR)
 执行插件 #{plugin.name} 时发生异常：#{ex}

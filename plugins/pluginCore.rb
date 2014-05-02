@@ -251,7 +251,7 @@ RESPONSE
 				#noinspection RubyResolve
 				if @filter.empty?
 					@responses[:filter_list_empty]
-				elsif form.is_a?(WebQQProtocol::QQGroup)
+				elsif from.is_a?(WebQQProtocol::QQGroup)
 					@filter.map{ |number| from.member_by_number(number) || number }.join("\n")
 				else
 					@filter.join("\n")

@@ -40,7 +40,7 @@ MANUAL
 				end
 				response
 			else # 异常
-				"查询天气时遭遇错误，错误代码 #{data[KEY_ERROR]}"
+				"查询天气时遭遇错误，错误代码 #{json_data[KEY_ERROR]}"
 			end
 		end
 	end

@@ -6,24 +6,27 @@ require 'yaml'
 #noinspection RubyTooManyMethodsInspection
 class PluginManager
 	FILE_RULES = 'plugin_rules.yaml'
-	KEY_POLL_TYPE = 'poll_type'
-	KEY_VALUE = 'value'
-	KEY_FROM_UIN = 'from_uin'
-	KEY_SEND_UIN = 'send_uin'
-	KEY_CONTENT  = 'content'
-	KEY_TIME     = 'time'
+	JSON_KEY_POLL_TYPE = 'poll_type'
+	JSON_KEY_VALUE     = 'value'
+	JSON_KEY_FROM_UIN  = 'from_uin'
+	JSON_KEY_SEND_UIN  = 'send_uin'
+	JSON_KEY_CONTENT   = 'content'
+	JSON_KEY_TIME      = 'time'
 
 	attr_reader :plugins
 
+	# @param [QQBot] qqbot
+	# @param [Logger] logger
 	def initialize(qqbot, logger)
 		@qqbot  = qqbot
 		@logger = logger
 		@plugins = []
 	end
 
+	# @param [Hash] data
 	def on_event(data)
-		poll_type = data[KEY_POLL_TYPE]
-		value     = data[KEY_VALUE]
+		poll_type = data[JSON_KEY_POLL_TYPE]
+		value     = data[JSON_KEY_VALUE]
 		event     = :"on_#{poll_type}"
 		send(event, value)
 	end
@@ -99,9 +102,7 @@ class PluginManager
 
 	# @param [WebQQProtocol::QQGroup] group
 	def filtered_plugins(group)
-		@plugins.select do |plugin|
-			not forbidden?(plugin.class.name, group)
-		end
+		@plugins.select { |plugin| not forbidden?(plugin.class.name, group) }
 	end
 
 	private
@@ -119,6 +120,7 @@ class PluginManager
 		Dir.glob('plugins/plugin?*.rb') { |file_name| load file_name }
 	end
 
+	# @param [PluginBase] plugin
 	def registry_plugin(plugin)
 		@message_plugins        << plugin if plugin.respond_to? :on_message
 		@group_message_plugins  << plugin if plugin.respond_to? :on_group_message
@@ -160,6 +162,7 @@ LOG
 		Object.send(:remove_const, :PluginBase)
 	end
 
+	# @param [PluginBase] plugin
 	def unload_plugin(plugin)
 		begin
 			plugin.on_unload
@@ -191,10 +194,12 @@ LOG
 		end
 	end
 
+
+	# @param [Hash] value
 	def on_message(value)
-		sender = @qqbot.friend(value[KEY_FROM_UIN])
-		message = QQBot.message(value[KEY_CONTENT])
-		time = Time.at(value[KEY_TIME])
+		sender = @qqbot.friend_by_uin(value[JSON_KEY_FROM_UIN])
+		message = QQBot.message(value[JSON_KEY_CONTENT])
+		time = Time.at(value[JSON_KEY_TIME])
 		@message_plugins.each do |plugin|
 			begin
 				return if plugin.on_message(sender, message, time)
@@ -208,11 +213,12 @@ LOG
 		end
 	end
 
+	# @param [Hash] value
 	def on_group_message(value)
-		from = @qqbot.group(value[KEY_FROM_UIN])
-		sender = from.member(value[KEY_SEND_UIN])
-		message = QQBot.message(value[KEY_CONTENT])
-		time = Time.at(value[KEY_TIME])
+		from = @qqbot.group_by_uin(value[JSON_KEY_FROM_UIN])
+		sender = from.member_by_uin(value[JSON_KEY_SEND_UIN])
+		message = QQBot.message(value[JSON_KEY_CONTENT])
+		time = Time.at(value[JSON_KEY_TIME])
 		@group_message_plugins.each do |plugin|
 			next if forbidden?(plugin.class.name, from)
 			begin
@@ -227,6 +233,7 @@ LOG
 		end
 	end
 
+	# @param [Hash] value
 	def on_system_message(value)
 		@system_message_plugins.each do |plugin|
 			plugin.on_system_message(value)

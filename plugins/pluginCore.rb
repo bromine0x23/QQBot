@@ -9,8 +9,6 @@ class PluginCore < PluginNicknameResponderCombineFunctionBase
 	DESCRIPTION = 'QQBot核心'
 	MANUAL = <<MANUAL.strip
 ==> 系统插件 <==
-== 列出管理员 ==
-权限狗列表
 == 列出已启用插件 ==
 插件列表
 == 列出插件优先级 ==
@@ -90,23 +88,23 @@ SQL
 	def close_db
 		@db.close
 	end
-=begin
+
 	def on_message(sender, message, time)
-		@db.transaction do |db|
-			db.execute(SQL_INSERT_MESSAGE, sender.number, sender.name, message, time.to_i)
-		end
+		#@db.transaction do |db|
+		#	db.execute(SQL_INSERT_MESSAGE, sender.number, sender.name, message, time.to_i)
+		#end
 		return true if @filter.include? sender.number
 		super
 	end
 
 	def on_group_message(from, sender, message, time)
-		@db.transaction do |db|
-			db.execute(SQL_INSERT_GROUP_MESSAGE, from.number, from.name, sender.number, sender.name, message, time.to_i)
-		end
+		#@db.transaction do |db|
+		#	db.execute(SQL_INSERT_GROUP_MESSAGE, from.number, from.name, sender.number, sender.name, message, time.to_i)
+		#end
 		return true if @filter.include? sender.number
 		super
 	end
-=end
+
 	JSON_KEY_TYPE    = 'type'
 	JSON_KEY_ACCOUNT = 'account'
 	STRING_VERIFY_REQUIRED = 'verify_required'
@@ -134,6 +132,8 @@ SQL
 	COMMAND_PLUGIN_ENABLE   = /^启用插件\s*(?<plugin_name>.+)/
 	COMMAND_PLUGIN_DISABLE  = /^停用插件\s*(?<plugin_name>.+)/
 
+	# @param [WebQQProtocol::QQEntity] from
+	# @param [String] command
 	def function_list_plugins(from, _, command, _)
 		if COMMAND_LIST_PLUGINS == command
 			header = "已启用插件：\n"
@@ -143,12 +143,16 @@ SQL
 		end
 	end
 
+	# @param [WebQQProtocol::QQEntity] from
+	# @param [String] command
 	def function_list_priorities(from, _, command, _)
 		if COMMAND_LIST_PRIORITIES == command
 			qqbot.plugins(from).map { |plugin| "#{plugin.name} => #{plugin.priority}" }.join("\n")
 		end
 	end
 
+	# @param [WebQQProtocol::QQEntity] sender
+	# @param [String] command
 	def function_reload_plugins(_, sender, command, _)
 		if COMMAND_RELOAD_PLUGINS == command
 			if qqbot.master?(sender)
@@ -166,6 +170,8 @@ SQL
 		end
 	end
 
+	# @param [WebQQProtocol::QQEntity] sender
+	# @param [String] command
 	def function_start_gc(_, sender, command, _)
 		if COMMAND_START_GC == command
 			if qqbot.master?(sender)
@@ -179,6 +185,8 @@ SQL
 		end
 	end
 
+	# @param [WebQQProtocol::QQEntity] sender
+	# @param [String] command
 	def function_object_check(_, sender, command, _)
 		if COMMAND_OBJECT_CHECK == command
 			if qqbot.master?(sender)
@@ -204,6 +212,8 @@ RESPONSE
 		end
 	end
 
+	# @param [WebQQProtocol::QQEntity] sender
+	# @param [String] command
 	def function_start_debug(_, sender, command, _)
 		if COMMAND_START_DEBUG == command
 			if qqbot.master?(sender)
@@ -217,6 +227,8 @@ RESPONSE
 		end
 	end
 
+	# @param [WebQQProtocol::QQEntity] sender
+	# @param [String] command
 	def function_stop_debug(_, sender, command, _)
 		if COMMAND_STOP_DEBUG == command
 			if qqbot.master?(sender)
@@ -230,11 +242,20 @@ RESPONSE
 		end
 	end
 
+	# @param [WebQQProtocol::QQEntity] from
+	# @param [WebQQProtocol::QQEntity] sender
+	# @param [String] command
 	def function_display_filter_list(from, sender, command, _)
 		if COMMAND_FILTER_LIST == command
 			if qqbot.master?(sender) or qqbot.group_manager?(from, sender)
 				#noinspection RubyResolve
-				@filter.empty? ? @responses[:filter_list_empty] : @filter.join("\n")
+				if @filter.empty?
+					@responses[:filter_list_empty]
+				elsif form.is_a?(WebQQProtocol::QQGroup)
+					@filter.map{ |number| from.member_by_number(number) || number }.join("\n")
+				else
+					@filter.join("\n")
+				end
 			else
 				#noinspection RubyResolve
 				@responses[:no_permission] % {command: command}
@@ -242,6 +263,9 @@ RESPONSE
 		end
 	end
 
+	# @param [WebQQProtocol::QQEntity] from
+	# @param [WebQQProtocol::QQEntity] sender
+	# @param [String] command
 	def function_filter_add(from, sender, command, _)
 		if COMMAND_FILTER_ADD =~ command
 			if qqbot.master?(sender) or qqbot.group_manager?(from, sender)
@@ -257,6 +281,9 @@ RESPONSE
 		end
 	end
 
+	# @param [WebQQProtocol::QQEntity] from
+	# @param [WebQQProtocol::QQEntity] sender
+	# @param [String] command
 	def function_filter_remove(from, sender, command, _)
 		if COMMAND_FILTER_REMOVE =~ command
 			if qqbot.master?(sender) or qqbot.group_manager?(from, sender)
@@ -272,6 +299,7 @@ RESPONSE
 		end
 	end
 
+	# @param [String] command
 	def function_plugin_manual(_, _, command, _)
 		if COMMAND_PLUGIN_MANUAL =~ command
 			plugin = qqbot.plugin($~[:plugin_name])
@@ -285,7 +313,10 @@ RESPONSE
 		end
 	end
 
-	def function_plugin_enable(_, _, command, _)
+	# @param [WebQQProtocol::QQEntity] from
+	# @param [WebQQProtocol::QQEntity] sender
+	# @param [String] command
+	def function_plugin_enable(from, sender, command, _)
 		if COMMAND_PLUGIN_ENABLE =~ command
 			if qqbot.master?(sender) or qqbot.group_manager?(from, sender)
 				plugin = qqbot.plugin($~[:plugin_name])
@@ -304,7 +335,10 @@ RESPONSE
 		end
 	end
 
-	def function_plugin_disable(_, _, command, _)
+	# @param [WebQQProtocol::QQEntity] from
+	# @param [WebQQProtocol::QQEntity] sender
+	# @param [String] command
+	def function_plugin_disable(from, sender, command, _)
 		if COMMAND_PLUGIN_DISABLE =~ command
 			if qqbot.master?(sender) or qqbot.group_manager?(from, sender)
 				plugin = qqbot.plugin($~[:plugin_name])

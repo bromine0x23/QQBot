@@ -133,18 +133,28 @@ class QQBot
 	end
 
 	# @return [WebQQProtocol::QQEntity]
-	def entity(uin)
-		@client.entity(uin)
+	def entity_by_uin(uin)
+		@client.entity_by_uin(uin)
 	end
 
 	# @return [WebQQProtocol::QQFriend]
-	def friend(uin)
-		@client.friend(uin)
+	def friend_by_uin(uin)
+		@client.friend_by_uin(uin)
+	end
+
+	# @return [WebQQProtocol::QQFriend]
+	def friend_by_number(number)
+		@client.friend_by_number(number)
+	end
+
+	# @return [WebQQProtocol::QQFriend]
+	def friend_by_name(name)
+		@client.friend_by_name(name)
 	end
 
 	# @return [WebQQProtocol::QQGroup]
-	def group(guin)
-		@client.group(guin)
+	def group_by_uin(guin)
+		@client.group_by_uin(guin)
 	end
 
 	# @return [WebQQProtocol::QQFriend]

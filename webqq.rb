@@ -461,12 +461,12 @@ LOG
 			@receiver = MessageReceiver.new(@client_id, @p_session_id, @net_client.cookies.to_s, logger)
 			@sender   = MessageSender.new(@client_id, @p_session_id, @net_client.cookies.to_s, logger)
 
-			group_list = Hash[fetch_groups['gnamelist'].map!{ |gname| [gname['gid'], gname] }]
-			@groups = Hash.new{ |hash, key| hash[key] = QQGroup.new(self, group_list[key]) }
+			@groups = Hash[fetch_groups['gnamelist'].map!{ |gname| [gname['gid'], QQGroup.new(self, gname)] }]
 
-			json_data = fetch_friends
-			friend_list = Hash[json_data['marknames'].map!{|markname| [markname['uin'], markname['markname']] }].merge!(Hash[json_data['info'].map!{|info| [info['uin'], info['nick']]}])
-			@friends = Hash.new{ |hash, key| hash[key] = QQFriend.new(key, fetch_qq_number(key), friend_list[key]) }
+			#json_data = fetch_friends
+			#friend_list = Hash[json_data['marknames'].map!{|markname| [markname['uin'], markname['markname']] }].merge!(Hash[json_data['info'].map!{|info| [info['uin'], info['nick']]}])
+			#@friends = Hash.new{ |hash, key| hash[key] = QQFriend.new(key, fetch_qq_number(key), friend_list[key]) }
+			@friends = {}
 
 			log('客户端建立成功')
 		end

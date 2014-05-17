@@ -118,6 +118,7 @@ MANUAL
 
 	def function_fortune(_, sender, command, time)
 		if COMMAND_FORTUNE =~ command
+			return "#{get_date_string(time)}#{get_lunar_date_string(time)}#{sender.name} 的运势指数：＋∞(Ultra Lucky!)" if time.year == 2014 and time.month == 5 and time.month == 18
 			level = random(get_seed(time) * sender.number, 6) % 100 # 迷之伪随机6
 			"#{get_date_string(time)}#{get_lunar_date_string(time)}#{sender.name} 的运势指数：#{STR_FORTUNE_LEVELS[level / 5]}(#{level})"
 		end

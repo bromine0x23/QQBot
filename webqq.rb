@@ -164,7 +164,7 @@ module WebQQProtocol
 	class MessageReceiver
 		JSON_KEY_RETCODE = 'retcode'
 		JSON_KEY_RESULT  = 'result'
-		TIMEOUT = 120
+		TIMEOUT = 300
 		REDO_LIMIT = 10
 
 		attr_reader :thread

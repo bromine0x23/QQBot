@@ -7,8 +7,11 @@ require 'net/http'
 require 'net/https'
 require 'webrick/cookie'
 
+require_relative 'hash'
+
 # WebQQ客户端
 module WebQQProtocol
+
 	APPID = 1003903
 	JS_VER = 10071
 	JS_TYPE = 0
@@ -117,46 +120,6 @@ module WebQQProtocol
 
 		def message
 			"WebQQ login failed: state => #{@state}, info => #{@info}"
-		end
-	end
-
-	# 哈希算法
-	module Encrypt
-		# 密码加密
-		def self.encrypt_password(password, verify_code, key)
-			md5(md5(hex2ascii(md5(password) + key.gsub!(/\\x/, ''))) + verify_code)
-		end
-
-		# 腾讯迷の哈希
-		def self.hash_friends(b, i)
-			a = [0, 0, 0, 0]
-			i.bytes.each_with_index { |c, s| a[s % 4] ^= c.ord }
-			d = [
-				b >> 24 & 255 ^ 69, # 69 => E
-				b >> 16 & 255 ^ 67, # 67 => C
-				b >>  8 & 255 ^ 79, # 79 => O
-				b >>  0 & 255 ^ 75  # 75 => K
-			]
-			j = Array.new(8) {|s| s % 2 == 0 ? a[s >> 1] : d[s >> 1]}
-			a = '0123456789ABCDEF'
-			d = ''
-			j.each do |c|
-				d += a[c >> 4 & 15] + a[c & 15]
-			end
-			d
-		end
-
-		private
-
-		# 将十六进制数字串每两个编码为ASCII码对应的字符
-		def self.hex2ascii(hex_str)
-			hex_str.scan(/\w{2}/).map { |byte_str| byte_str.to_i(16).chr }.join
-		end
-
-		# MD5哈希
-		#noinspection RubyResolve
-		def self.md5(src)
-			Digest::MD5.hexdigest(src).upcase
 		end
 	end
 
@@ -578,7 +541,7 @@ LOG
 				),
 				JSON.fast_generate(
 					h: 'hello',
-					hash: Encrypt.hash_friends(@uin, @ptwebqq),
+					hash: Hash.hash_friends(@uin, @ptwebqq),
 					vfwebqq: @verify_webqq
 				)
 			)
@@ -779,7 +742,7 @@ LOG
 
 			#加密密码
 			log(logger, '加密密码……', Logger::DEBUG) if $-d
-			password_encrypted = Encrypt.encrypt_password(password, verify_code, key)
+			password_encrypted = Hash.hash_password(password, verify_code, key)
 			log(logger, "密码加密为：#{password_encrypted}", Logger::DEBUG) if $-d
 
 			# 验证账号

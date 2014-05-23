@@ -85,7 +85,7 @@ class QQBot
 
 	# @return [String]
 	def self.message(content)
-		content.select { |item| item.is_a? String }.join.strip
+		content.select { |item| item.is_a? String }.join.force_encoding('utf-8').strip
 	end
 
 	# @return [PluginBase]

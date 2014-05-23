@@ -1,58 +1,61 @@
 # -*- coding: utf-8 -*-
 
-require_relative 'webqq'
+require_relative 'webqq/webqq'
 require_relative 'plugin_manager'
+
 require 'yaml'
 
-#noinspection RubyTooManyInstanceVariablesInspection
+#noinspection RubyTooManyMethodsInspection
 class QQBot
 	FILE_CONFIG = 'config.yaml'
 
-	attr_reader :name
+	attr_reader :nick
 	attr_reader :masters
 	attr_reader :plugin_manager
 
 	def initialize
 		load_config
+
 		init_logger
-		@plugin_manager = PluginManager.new(self, @logger)
+
+		init_client
+
+		load_plugins
 	end
 
 	def load_config
-		config = YAML.load_file(FILE_CONFIG)
-		common_config = config[:common]
-		@log_file = common_config[:log_file] || 'qqbot.log'
-		@captcha_file = common_config[:captcha_file] || 'captcha.jpg'
-		@qq, @password = common_config[:qq], common_config[:password]
-		raise Exception.new('未设置QQ号或密码') unless @qq and @password
-		@name = common_config[:name]
-		@masters = common_config[:masters]
-		@font_config = config[:font]
+		@config = YAML.load_file(FILE_CONFIG)
+		@nick = @config[:common][:name]
+		@masters = @config[:common][:masters]
+		@font_config = @config[:font]
 	end
 
 	def init_logger
-		@logger = Logger.new(@log_file, File::WRONLY | File::APPEND | File::CREAT)
+		@logger = Logger.new(@config[:common][:log_file] || 'qqbot.log', File::WRONLY | File::APPEND | File::CREAT)
 		@logger.formatter = proc do |severity, datetime, prog_name, msg|
 			prog_name ? "[#{datetime}][#{severity}][#{prog_name}] #{msg}\n" : "[#{datetime}][#{severity}] #{msg}\n"
 		end
-		@logger
 	end
 
-	def run
-		log('开始运行……')
+	def init_client
 		begin
-			@client = WebQQProtocol.login(@qq, @password, @logger, self.method(:on_captcha_need))
+			raise Exception.new('未设置QQ号或密码') unless @config[:common][:qq] and @config[:common][:password]
+			@client = WebQQProtocol::Client.new(@config[:common][:qq], @config[:common][:password], @logger, self.method(:on_captcha_need))
 		rescue WebQQProtocol::LoginFailed
 			puts '登录失败'
 			raise
 		end
 		puts '登录成功！'
-		@message_receiver = @client.receiver
-		@message_sender   = @client.sender
-		load_plugins
+
+		@plugin_manager = PluginManager.new(self, @client, @logger)
+	end
+
+	def run
+		log('开始运行……')
+
 		begin
 			loop do
-				datas = @message_receiver.data
+				datas = @client.poll_data
 				log("data => #{datas}") if $-d
 				datas.each do |data|
 					@plugin_manager.on_event(data)
@@ -64,20 +67,20 @@ class QQBot
 	end
 
 	def stop
-		@client.logout
-		@message_receiver.thread.kill
-		@message_receiver = nil
-		@message_sender.thread.kill
-		@message_sender = nil
+		@client.stop
 		unload_plugins
 	end
 
 	def send_message(from, message, font = {})
-		@message_sender.send_message(from.uin, message.strip, @font_config.merge(font))
+		@client.send_message(from.uin, message.strip, @font_config.merge(font))
 	end
 
 	def send_group_message(from, message, font = {})
-		@message_sender.send_group_message(from.uin, message.strip, @font_config.merge(font))
+		@client.send_group_message(from.uin, message.strip, @font_config.merge(font))
+	end
+
+	def send_discuss_message(from, message, font = {})
+		@client.send_discuss_message(from.uin, message.strip, @font_config.merge(font))
 	end
 
 	# @return [String]
@@ -92,7 +95,7 @@ class QQBot
 
 	# @param [WebQQProtocol::QQEntity] from
 	def plugins(from)
-		from.is_a?(WebQQProtocol::QQGroup) ? @plugin_manager.filtered_plugins(from) : @plugin_manager.plugins
+		from.is_a?(WebQQProtocol::Group) ? @plugin_manager.filtered_plugins(from) : @plugin_manager.plugins
 	end
 
 	def load_plugins
@@ -111,55 +114,25 @@ class QQBot
 	# @param [WebQQProtocol::QQEntity] sender
 	# @param [PluginBase] plugin
 	def enable_plugin(from, sender, plugin)
-		@plugin_manager.enable_plugin(from, sender, plugin) if from.is_a? WebQQProtocol::QQGroup
+		@plugin_manager.enable_plugin(from, sender, plugin) if from.is_a? WebQQProtocol::Group
 	end
 
 	# @param [WebQQProtocol::QQEntity] from
 	# @param [WebQQProtocol::QQEntity] sender
 	# @param [PluginBase] plugin
 	def disable_plugin(from, sender, plugin)
-		@plugin_manager.disable_plugin(from, sender, plugin) if from.is_a? WebQQProtocol::QQGroup
+		@plugin_manager.disable_plugin(from, sender, plugin) if from.is_a? WebQQProtocol::Group
 	end
 
 	# @param [WebQQProtocol::QQGroup] group
 	# @param [WebQQProtocol::QQGroupMember] member
 	def group_manager?(group, member)
-		@masters.group_manager?(group, member) if group.is_a? WebQQProtocol::QQGroup
+		@masters.group_manager?(group, member) if group.is_a? WebQQProtocol::Group
 	end
 
 	# @param [WebQQProtocol::QQEntity] sender
 	def master?(sender)
 		@masters.include? sender.number
-	end
-
-	# @return [WebQQProtocol::QQEntity]
-	def entity_by_uin(uin)
-		@client.entity_by_uin(uin)
-	end
-
-	# @return [WebQQProtocol::QQFriend]
-	def friend_by_uin(uin)
-		@client.friend_by_uin(uin)
-	end
-
-	# @return [WebQQProtocol::QQFriend]
-	def friend_by_number(number)
-		@client.friend_by_number(number)
-	end
-
-	# @return [WebQQProtocol::QQFriend]
-	def friend_by_name(name)
-		@client.friend_by_name(name)
-	end
-
-	# @return [WebQQProtocol::QQGroup]
-	def group_by_uin(guin)
-		@client.group_by_uin(guin)
-	end
-
-	# @return [WebQQProtocol::QQFriend]
-	def add_friend(qq_number)
-		@client.add_friend(qq_number)
 	end
 
 	private
@@ -169,11 +142,11 @@ class QQBot
 	end
 
 	def on_captcha_need(image_data)
-		File.open(@captcha_file, 'wb') do |file|
+		captcha_file = @config[:common][:captcha_file] || 'captcha.jpg'
+		File.open(captcha_file, 'wb') do |file|
 			file << image_data
 		end
-		puts "验证码已保存到 #{@captcha_file}, 请输入验证码："
-		# `start #{@captcha_file}`
+		puts "验证码已保存到 #{captcha_file}, 请输入验证码："
 		gets.strip.upcase
 	end
 end

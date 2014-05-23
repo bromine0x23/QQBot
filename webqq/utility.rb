@@ -3,7 +3,7 @@
 module WebQQProtocol
 
 	# 哈希算法
-	module Hash
+	module Utility
 		# 哈希密码
 		def self.hash_password(password, verify_code, key)
 			md5(md5(hex2ascii(md5(password) + key.gsub!(/\\x/, ''))) + verify_code)
@@ -15,14 +15,14 @@ module WebQQProtocol
 			l = [
 				uin >> 24 & 255,
 				uin >> 16 & 255,
-				uin >>  8 & 255,
-				uin >>  0 & 255,
+				uin >> 8 & 255,
+				uin >> 0 & 255,
 			]
-			values = ptwebqq.chars.map {|char| char.ord}
-			stack = [[0, t.length - 1]]
+			values = ptwebqq.chars.map { |char| char.ord }
+			stack = [[0, values.length - 1]]
 			while stack.size > 0
 				left, right = stack.pop
-				if left <= right and 0 <= left and right < t.length
+				if left <= right and 0 <= left and right < values.length
 					if left + 1 == right
 						values[left], values[right] = values[right], values[left] if values[left] > values[right]
 					else
@@ -49,7 +49,7 @@ module WebQQProtocol
 							end
 						end
 						values[i] = pivot
-						v << [left, i - 1] << [i + 1, right]
+						stack << [left, i - 1] << [i + 1, right]
 					end
 				end
 			end

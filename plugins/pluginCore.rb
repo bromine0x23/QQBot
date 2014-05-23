@@ -105,39 +105,39 @@ SQL
 		super
 	end
 
-	JSON_KEY_TYPE    = 'type'
+	JSON_KEY_TYPE = 'type'
 	JSON_KEY_ACCOUNT = 'account'
 	STRING_VERIFY_REQUIRED = 'verify_required'
 
 	def on_system_message(value)
 		super
 		if value[JSON_KEY_TYPE] == STRING_VERIFY_REQUIRED
-			friend = qqbot.add_friend(value[JSON_KEY_ACCOUNT])
+			friend = client.add_friend(value[JSON_KEY_ACCOUNT])
 			log("和#{friend.name}（#{friend.number}）成为了好友")
 			true
 		end
 	end
 
-	COMMAND_LIST_PLUGINS    = '插件列表'
+	COMMAND_LIST_PLUGINS = '插件列表'
 	COMMAND_LIST_PRIORITIES = '插件优先级'
-	COMMAND_RELOAD_PLUGINS  = '重载插件'
-	COMMAND_START_GC        = '垃圾回收'
-	COMMAND_OBJECT_CHECK    = '检视对象'
-	COMMAND_START_DEBUG     = '开始调试'
-	COMMAND_STOP_DEBUG      = '结束调试'
-	COMMAND_FILTER_LIST     = '屏蔽列表'
-	COMMAND_FILTER_ADD      = /^屏蔽\s*(?<number>\d+)/
-	COMMAND_FILTER_REMOVE   = /^(停止|取消)屏蔽\s*(?<number>\d+)/
-	COMMAND_PLUGIN_MANUAL   = /^插件帮助\s*(?<plugin_name>.+)/
-	COMMAND_PLUGIN_ENABLE   = /^启用插件\s*(?<plugin_name>.+)/
-	COMMAND_PLUGIN_DISABLE  = /^停用插件\s*(?<plugin_name>.+)/
+	COMMAND_RELOAD_PLUGINS = '重载插件'
+	COMMAND_START_GC = '垃圾回收'
+	COMMAND_OBJECT_CHECK = '检视对象'
+	COMMAND_START_DEBUG = '开始调试'
+	COMMAND_STOP_DEBUG = '结束调试'
+	COMMAND_FILTER_LIST = '屏蔽列表'
+	COMMAND_FILTER_ADD = /^屏蔽\s*(?<number>\d+)/
+	COMMAND_FILTER_REMOVE = /^(停止|取消)屏蔽\s*(?<number>\d+)/
+	COMMAND_PLUGIN_MANUAL = /^插件帮助\s*(?<plugin_name>.+)/
+	COMMAND_PLUGIN_ENABLE = /^启用插件\s*(?<plugin_name>.+)/
+	COMMAND_PLUGIN_DISABLE = /^停用插件\s*(?<plugin_name>.+)/
 
 	# @param [WebQQProtocol::QQEntity] from
 	# @param [String] command
 	def function_list_plugins(from, _, command, _)
 		if COMMAND_LIST_PLUGINS == command
 			header = "已启用插件：\n"
-			body = qqbot.plugins(from).map { |plugin| "#{plugin.name}[#{plugin.author}<#{plugin.version}>]：#{plugin.description}" }.join("\n")
+			body = qqbot.plugins(from).join("\n")
 			#noinspection RubyResolve
 			header << (body.empty? ? @responses[:plugin_list_empty] : body)
 		end
@@ -252,7 +252,7 @@ RESPONSE
 				if @filter.empty?
 					@responses[:filter_list_empty]
 				elsif from.is_a?(WebQQProtocol::QQGroup)
-					@filter.map{ |number| from.member_by_number(number) || number }.join("\n")
+					@filter.map { |number| from.member_by_number(number) || number }.join("\n")
 				else
 					@filter.join("\n")
 				end

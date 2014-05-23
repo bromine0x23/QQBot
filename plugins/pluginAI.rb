@@ -105,12 +105,12 @@ WHERE message_id = (
 )
 SQL
 
-	COMMAND_SAY             = /^说(?<response>.*)/m
-	COMMAND_FORGET          = /^忘记(?<message>.*)/m
-	COMMAND_LEARN           = /^学习(?<command>.*)/m
-	COMMAND_BLACKLIST       = /^(\d+)\s*是坏人$/
-	COMMAND_LEARN_ONELINE   = /^ (?<message>\S+) +(?<response>.+)/
-	COMMAND_LEARN_TOWLINE   = /^[\r\n](?<message>[^\r\n]+)[\r\n]+(?<response>.+)/m
+	COMMAND_SAY = /^说(?<response>.*)/m
+	COMMAND_FORGET = /^忘记(?<message>.*)/m
+	COMMAND_LEARN = /^学习(?<command>.*)/m
+	COMMAND_BLACKLIST = /^(\d+)\s*是坏人$/
+	COMMAND_LEARN_ONELINE = /^ (?<message>\S+) +(?<response>.+)/
+	COMMAND_LEARN_TOWLINE = /^[\r\n](?<message>[^\r\n]+)[\r\n]+(?<response>.+)/m
 	COMMAND_LEARN_MULTILINE = /^=(?<delimiter>\w+)\s*[\r\n](?<message>.+?)[\r\n]\k<delimiter>(?<response>.+)/m
 
 	def on_load
@@ -151,7 +151,7 @@ SQL
 		if COMMAND_LEARN =~ command
 			command = $~[:command]
 			if COMMAND_LEARN_MULTILINE =~ command or COMMAND_LEARN_TOWLINE =~ command or COMMAND_LEARN_ONELINE =~ command
-				message  = $~[:message].strip
+				message = $~[:message].strip
 				response = $~[:response].strip
 				#noinspection RubyResolve
 				if response.length < @response_limit
@@ -169,9 +169,9 @@ SQL
 	end
 
 	def function_response(_, sender, command, _)
-		result = @db.execute(SQL_SELECT_RESPONSES, command).map!{ |row| row[0] }.sample
+		result = @db.execute(SQL_SELECT_RESPONSES, command).map! { |row| row[0] }.sample
 		if result
-			result %  {我: qqbot_name, 你: sender.name}
+			result % {我: nick, 你: sender.name}
 		else
 			#noinspection RubyResolve
 			@responses[:null].sample

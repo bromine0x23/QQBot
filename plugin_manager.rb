@@ -3,11 +3,11 @@
 require 'set'
 require 'yaml'
 
+require_relative 'webqq/webqq'
+
 #noinspection RubyTooManyMethodsInspection
 class PluginManager
 	FILE_RULES = 'plugin_rules.yaml'
-	JSON_KEY_POLL_TYPE = 'poll_type'
-	JSON_KEY_VALUE     = 'value'
 	JSON_KEY_FROM_UIN  = 'from_uin'
 	JSON_KEY_SEND_UIN  = 'send_uin'
 	JSON_KEY_CONTENT   = 'content'
@@ -15,18 +15,18 @@ class PluginManager
 
 	attr_reader :plugins
 
-	# @param [QQBot] qqbot
+	# @param [WebQQProtocol::Client] client
 	# @param [Logger] logger
-	def initialize(qqbot, logger)
-		@qqbot  = qqbot
+	def initialize(qqbot, client, logger)
+		@qqbot = qqbot
+		@client = client
 		@logger = logger
 		@plugins = []
 	end
 
 	# @param [Hash] data
 	def on_event(data)
-		poll_type = data[JSON_KEY_POLL_TYPE]
-		value     = data[JSON_KEY_VALUE]
+		poll_type, value = data['poll_type'], data['value']
 		event     = :"on_#{poll_type}"
 		send(event, value)
 	end
@@ -73,34 +73,34 @@ class PluginManager
 		@plugins.find{ |plugin| plugin.name == plugin_name }
 	end
 
-	# @param [WebQQProtocol::QQGroup] group
-	# @param [WebQQProtocol::QQGroupMember] member
+	# @param [WebQQProtocol::Group] group
+	# @param [WebQQProtocol::GroupMember] member
 	def group_manager?(group, member)
 		@rules[group.number][:group_managers].include?(member.number)
 	end
 
-	# @param [WebQQProtocol::QQGroup] group
-	# @param [WebQQProtocol::QQGroupMember] member
+	# @param [WebQQProtocol::Group] group
+	# @param [WebQQProtocol::GroupMember] member
 	# @param [PluginBase] plugin
 	def enable_plugin(group, member, plugin)
 		@rules[group.number][:forbidden_list].delete(plugin.class.name) if group_manager?(group, member)
 		save_rules
 	end
 
-	# @param [WebQQProtocol::QQGroup] group
-	# @param [WebQQProtocol::QQGroupMember] member
+	# @param [WebQQProtocol::Group] group
+	# @param [WebQQProtocol::GroupMember] member
 	# @param [PluginBase] plugin
 	def disable_plugin(group, member, plugin)
 		@rules[group.number][:forbidden_list].add(plugin.class.name) if group_manager?(group, member)
 		save_rules
 	end
 
-	# @param [WebQQProtocol::QQGroup] group
+	# @param [WebQQProtocol::Group] group
 	def forbidden?(plugin_name, group)
 		@rules[group.number][:forbidden_list].include? plugin_name
 	end
 
-	# @param [WebQQProtocol::QQGroup] group
+	# @param [WebQQProtocol::Group] group
 	def filtered_plugins(group)
 		@plugins.select { |plugin| not forbidden?(plugin.class.name, group) }
 	end
@@ -130,7 +130,7 @@ class PluginManager
 	def registry_plugins
 		PluginBase.instance_plugins.each do |plugin_class|
 			begin
-				plugin = plugin_class.new(@qqbot, @logger)
+				plugin = plugin_class.new(@qqbot, @client, @logger)
 				plugin.on_load
 				@plugins << plugin
 				registry_plugin(plugin)
@@ -197,15 +197,15 @@ LOG
 
 	# @param [Hash] value
 	def on_message(value)
-		sender = @qqbot.friend_by_uin(value[JSON_KEY_FROM_UIN])
-		message = QQBot.message(value[JSON_KEY_CONTENT])
-		time = Time.at(value[JSON_KEY_TIME])
+		sender, = @client.friend_by_uin(value['from_uin'])
+		message = QQBot.message(value['content'])
+		time = Time.at(value['time'])
 		@message_plugins.each do |plugin|
 			begin
 				return if plugin.on_message(sender, message, time)
 			rescue Exception => ex
 				log(<<LOG, Logger::ERROR)
-执行插件 #{plugin.name} 时发生异常：#{ex}
+执行插件 #{plugin.name} 时发生异常：[#{ex}] #{ex.message}
 调用栈：
 #{ex.backtrace.join("\n")}
 LOG
@@ -215,28 +215,21 @@ LOG
 
 	# @param [Hash] value
 	def on_group_message(value)
-		from = @qqbot.group_by_uin(value[JSON_KEY_FROM_UIN])
-		sender = from.member_by_uin(value[JSON_KEY_SEND_UIN])
-		message = QQBot.message(value[JSON_KEY_CONTENT])
-		time = Time.at(value[JSON_KEY_TIME])
+		from = @client.group_by_uin(value['from_uin'])
+		sender = from.member_by_uin(value['send_uin'])
+		message = QQBot.message(value['content'])
+		time = Time.at(value['time'])
 		@group_message_plugins.each do |plugin|
 			next if forbidden?(plugin.class.name, from)
 			begin
 				return if plugin.on_group_message(from, sender, message, time)
 			rescue Exception => ex
 				log(<<LOG, Logger::ERROR)
-执行插件 #{plugin.name} 时发生异常：#{ex}
+执行插件 #{plugin.name} 时发生异常：[#{ex.class}] #{ex.message}
 调用栈：
 #{ex.backtrace.join("\n")}
 LOG
 			end
-		end
-	end
-
-	# @param [Hash] value
-	def on_system_message(value)
-		@system_message_plugins.each do |plugin|
-			plugin.on_system_message(value)
 		end
 	end
 

@@ -2,6 +2,8 @@
 
 require 'yaml'
 
+require_relative 'webqq/webqq'
+
 #noinspection RubyClassVariableUsageInspection,RubyTooManyMethodsInspection
 class PluginBase
 	NAME = '插件基类'
@@ -25,10 +27,11 @@ MANUAL
 		@@plugins
 	end
 
-	# @param [QQBot] qqbot
+	# @param [WebQQProtocol::Client] client
 	# @param [Logger] logger
-	def initialize(qqbot, logger)
+	def initialize(qqbot, client, logger)
 		@qqbot = qqbot
+		@client = client
 		@logger = logger
 	end
 
@@ -92,12 +95,13 @@ MANUAL
 		# 桩方法
 	end
 
+	def to_s
+		"#{name}[#{author}<#{version}>]：#{description}"
+	end
+
 	protected
 
-	# @return [QQBot]
-	def qqbot
-		@qqbot
-	end
+	attr_reader :qqbot, :client
 
 	def log(message, level = Logger::INFO)
 		@logger.log(level, message, self.class.name)
@@ -127,7 +131,7 @@ class PluginResponderBase < PluginBase
 	# @param [Time] time
 	def on_message(sender, message, time)
 		response = deal_message(sender, message, time)
-		@qqbot.send_message(sender, response) if response
+		@client.send_message(sender, response) if response
 	end
 
 	# @param [WebQQProtocol::QQGroup] from
@@ -136,7 +140,7 @@ class PluginResponderBase < PluginBase
 	# @param [Time] time
 	def on_group_message(from, sender, message, time)
 		response = deal_group_message(from, sender, message, time)
-		@qqbot.send_group_message(from, response) if response
+		@client.send_group_message(from, response) if response
 	end
 
 	# @param [WebQQProtocol::QQFriend] sender
@@ -158,9 +162,9 @@ end
 class PluginNicknameResponderBase < PluginResponderBase
 	NAME = '昵称呼叫型消息回应插件基类'
 
-	def initialize(qqbot, logger)
+	def initialize(qqbot, client, logger)
 		super
-		@qqbot_name = @qqbot.name
+		@nick = @qqbot.nick
 	end
 
 	# @param [WebQQProtocol::QQFriend] sender
@@ -175,7 +179,7 @@ class PluginNicknameResponderBase < PluginResponderBase
 	# @param [String] message
 	# @param [Time] time
 	def deal_group_message(from, sender, message, time)
-		if /^@?#{qqbot_name}\s*(?<message>.*)/ =~ message
+		if /^@?#{nick}\s*(?<message>.*)/ =~ message
 			get_response(from, sender, $~[:message], time)
 		end
 	end
@@ -189,10 +193,7 @@ class PluginNicknameResponderBase < PluginResponderBase
 	end
 
 	protected
-
-	def qqbot_name
-		@qqbot_name
-	end
+	attr_reader :nick
 end
 
 #noinspection ALL
@@ -212,7 +213,7 @@ class PluginNicknameResponderCombineFunctionBase < PluginNicknameResponderBase
 
 	# @return [Array[Symbol]]
 	def functions
-		@fuctions ||= methods.select! {|method_name| /^function_/ =~ method_name}
+		@fuctions ||= methods.select! { |method_name| /^function_/ =~ method_name }
 	end
 
 	def get_response(from, sender, command, time)

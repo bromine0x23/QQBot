@@ -1,0 +1,111 @@
+# -*- coding: utf-8 -*-
+
+require 'logger'
+require 'net/http'
+
+require_relative 'config'
+require_relative 'net_client'
+require_relative 'exception'
+
+module WebQQProtocol
+
+	class Client
+
+		# 消息接收线程
+		class Receiver
+			REDO_LIMIT = 5
+
+			attr_reader :thread
+
+			# 创建接收线程
+			#noinspection RubyScope
+			# @param [WebQQProtocol::Net] net
+			# @param [Logger] logger
+			def initialize(clientid, psessionid, net, logger)
+				@logger = logger
+				@messages= Queue.new
+				@thread = Thread.new(
+					clientid,
+					psessionid,
+					net
+				) do |clientid, psessionid, net|
+					log('线程启动……', Logger::DEBUG)
+					redo_count = 0
+					begin
+						request = Net::HTTP::Post.new(
+							URI('http://d.web2.qq.com/channel/poll2'),
+							net.header
+						)
+						request.set_form_data(
+							r: JSON.fast_generate(
+								clientid: clientid,
+								psessionid: psessionid,
+								key: ''
+							)
+						)
+						loop do
+							begin
+								@messages.push(NetClient.json_result(net.send(request, 120).body))
+							rescue ErrorCode => ex
+								case ex.retcode
+								when 102
+									next
+								when 116
+									# 重设 ptwebqq
+									net.cookie['ptwebqq'] = ex.data['p']
+								when 100
+									# NotReLogin
+									raise NotLogin.new
+								when 120, 121
+									log('ReLinkFailure', Logger::ERROR)
+									raise
+								when 109, 110
+									next
+								else
+									log("poll时遭遇未知代码：#{ex.retcode}", Logger::FATAL)
+									raise
+								end
+							end
+						end
+					rescue NotLogin
+						# TODO
+					rescue Exception => ex
+						log(<<LOG.strip, Logger::ERROR)
+发生异常：[#{ex.class}] #{ex.message}，于
+#{ex.backtrace.join("\n")}
+LOG
+						redo_count += 1
+						if redo_count > REDO_LIMIT
+							log("重试超过#{REDO_LIMIT}次，退出", Logger::FATAL)
+							raise
+						end
+						log('重试', Logger::ERROR)
+						redo
+					end
+				end
+				@thread.abort_on_exception = true
+			end
+
+			# 读取数据
+=begin
+可能的消息类型
+sess_message
+message
+group_message
+discu_message
+kick_message
+filesrv_transfer
+file_message
+push_offfile
+notify_offfile
+=end
+			def data
+				@messages.pop
+			end
+
+			def log(message, level = Logger::INFO)
+				@logger.log(level, message, self.class.name)
+			end
+		end
+	end
+end

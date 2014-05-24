@@ -21,14 +21,15 @@ module WebQQProtocol
 			#noinspection RubyScope
 			# @param [WebQQProtocol::Net] net
 			# @param [Logger] logger
-			def initialize(clientid, psessionid, net, logger)
+			def initialize(ptwebqq, clientid, psessionid, net, logger)
 				@logger = logger
 				@messages= Queue.new
 				@thread = Thread.new(
+					ptwebqq,
 					clientid,
 					psessionid,
 					net
-				) do |clientid, psessionid, net|
+				) do |ptwebqq, clientid, psessionid, net|
 					log('线程启动……', Logger::INFO)
 					
 					redo_count = 0
@@ -39,6 +40,7 @@ module WebQQProtocol
 					)
 					request.set_form_data(
 						r: JSON.fast_generate(
+							ptwebqq: ptwebqq,
 							clientid: clientid,
 							psessionid: psessionid,
 							key: ''
@@ -55,7 +57,14 @@ module WebQQProtocol
 									next
 								when 116
 									# 重设 ptwebqq
-									net.cookies['ptwebqq'] = ex.data['p']
+									request.set_form_data(
+										r: JSON.fast_generate(
+											ptwebqq: ex.data['p'],
+											clientid: clientid,
+											psessionid: psessionid,
+											key: ''
+										)
+									)
 								when 100
 									# NotReLogin
 									raise 'NotLogin'

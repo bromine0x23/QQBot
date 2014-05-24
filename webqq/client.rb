@@ -268,7 +268,7 @@ module WebQQProtocol
 		end
 
 		def init_thread
-			@receiver = Receiver.new(@clientid, @psessionid, @net, @logger)
+			@receiver = Receiver.new(ptwebqq, @clientid, @psessionid, @net, @logger)
 			@sender = Sender.new(@clientid, @psessionid, @net, @logger)
 		end
 
@@ -630,8 +630,8 @@ ptuiCB(state, _, address, _, info, nick);
 			)
 		end
 
-		def send_message(from, message, font = {})
-			@sender.send_message(from.uin, message.strip, font)
+		def send_buddy_message(from, message, font = {})
+			@sender.send_buddy_message(from.uin, message.strip, font)
 		end
 
 		def send_group_message(from, message, font = {})

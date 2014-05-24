@@ -28,7 +28,7 @@ module WebQQProtocol
 					psessionid,
 					net
 				) do |clientid, psessionid, net|
-					log('线程启动……', Logger::DEBUG)
+					log('线程启动……', Logger::INFO)
 
 					redo_count = 0
 
@@ -48,7 +48,6 @@ module WebQQProtocol
 						clientid: clientid,
 						psessionid: psessionid
 					}
-
 					begin
 						loop do
 							message = @messages.pop
@@ -91,7 +90,7 @@ LOG
 							raise
 						end
 						log('重试', Logger::ERROR)
-						redo
+						retry
 					end
 				end
 			end

@@ -29,8 +29,10 @@ module WebQQProtocol
 					psessionid,
 					net
 				) do |clientid, psessionid, net|
-					log('线程启动……', Logger::DEBUG)
+					log('线程启动……', Logger::INFO)
+					
 					redo_count = 0
+					
 					request = Net::HTTP::Post.new(
 						URI('http://d.web2.qq.com/channel/poll2'),
 						net.header
@@ -42,6 +44,7 @@ module WebQQProtocol
 							key: ''
 						)
 					)
+					
 					begin
 						loop do
 							begin
@@ -78,7 +81,7 @@ LOG
 							raise
 						end
 						log("第 #{redo_count} 次重试", Logger::ERROR)
-						redo
+						retry
 					end
 				end
 			end

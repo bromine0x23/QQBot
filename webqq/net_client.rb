@@ -33,6 +33,10 @@ module WebQQProtocol
 			def [](key)
 				@cookies[key].value
 			end
+			
+			def []=(key, value)
+				@cookies[key].value = value
+			end
 
 			def add!(cookie)
 				@cookies[cookie.name] = cookie

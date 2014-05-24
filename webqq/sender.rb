@@ -32,7 +32,7 @@ module WebQQProtocol
 
 					redo_count = 0
 
-					request_buddy = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_qun_msg2'), net.header)
+					request_buddy = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_buddy_msg2'), net.header)
 					request_qun = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_qun_msg2'), net.header)
 					request_discuss = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_discu_msg2'), net.header)
 

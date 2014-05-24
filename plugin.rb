@@ -126,7 +126,7 @@ end
 class PluginResponderBase < PluginBase
 	NAME = '消息回应插件基类'
 
-	# @param [WebQQProtocol::QQFriend] sender
+	# @param [WebQQProtocol::Friend] sender
 	# @param [String] message
 	# @param [Time] time
 	def on_message(sender, message, time)
@@ -134,8 +134,8 @@ class PluginResponderBase < PluginBase
 		@client.send_buddy_message(sender, response) if response
 	end
 
-	# @param [WebQQProtocol::QQGroup] from
-	# @param [WebQQProtocol::QQGroupMember] sender
+	# @param [WebQQProtocol::Group] from
+	# @param [WebQQProtocol::GroupMember] sender
 	# @param [String] message
 	# @param [Time] time
 	def on_group_message(from, sender, message, time)
@@ -143,15 +143,15 @@ class PluginResponderBase < PluginBase
 		@client.send_group_message(from, response) if response
 	end
 
-	# @param [WebQQProtocol::QQFriend] sender
+	# @param [WebQQProtocol::Friend] sender
 	# @param [String] message
 	# @param [Time] time
 	def deal_message(sender, message, time)
 		# 桩方法，好友消息响应
 	end
 
-	# @param [WebQQProtocol::QQGroup] from
-	# @param [WebQQProtocol::QQGroupMember] sender
+	# @param [WebQQProtocol::Group] from
+	# @param [WebQQProtocol::GroupMember] sender
 	# @param [String] message
 	# @param [Time] time
 	def deal_group_message(from, sender, message, time)
@@ -167,15 +167,15 @@ class PluginNicknameResponderBase < PluginResponderBase
 		@nick = @qqbot.nick
 	end
 
-	# @param [WebQQProtocol::QQFriend] sender
+	# @param [WebQQProtocol::Friend] sender
 	# @param [String] message
 	# @param [Time] time
 	def deal_message(sender, message, time)
 		get_response(sender, sender, message, time)
 	end
 
-	# @param [WebQQProtocol::QQGroup] from
-	# @param [WebQQProtocol::QQGroupMember] sender
+	# @param [WebQQProtocol::Group] from
+	# @param [WebQQProtocol::GroupMember] sender
 	# @param [String] message
 	# @param [Time] time
 	def deal_group_message(from, sender, message, time)
@@ -184,8 +184,8 @@ class PluginNicknameResponderBase < PluginResponderBase
 		end
 	end
 
-	# @param [WebQQProtocol::QQEntity] from
-	# @param [WebQQProtocol::QQEntity] sender
+	# @param [WebQQProtocol::Entity] from
+	# @param [WebQQProtocol::Entity] sender
 	# @param [String] command
 	# @param [Time] time
 	def get_response(from, sender, command, time)

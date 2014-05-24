@@ -31,18 +31,18 @@ module WebQQProtocol
 				) do |clientid, psessionid, net|
 					log('线程启动……', Logger::DEBUG)
 					redo_count = 0
+					request = Net::HTTP::Post.new(
+						URI('http://d.web2.qq.com/channel/poll2'),
+						net.header
+					)
+					request.set_form_data(
+						r: JSON.fast_generate(
+							clientid: clientid,
+							psessionid: psessionid,
+							key: ''
+						)
+					)
 					begin
-						request = Net::HTTP::Post.new(
-							URI('http://d.web2.qq.com/channel/poll2'),
-							net.header
-						)
-						request.set_form_data(
-							r: JSON.fast_generate(
-								clientid: clientid,
-								psessionid: psessionid,
-								key: ''
-							)
-						)
 						loop do
 							begin
 								@messages.push(NetClient.json_result(net.send(request, 120).body))
@@ -52,10 +52,10 @@ module WebQQProtocol
 									next
 								when 116
 									# 重设 ptwebqq
-									net.cookie['ptwebqq'] = ex.data['p']
+									net.cookies['ptwebqq'] = ex.data['p']
 								when 100
 									# NotReLogin
-									raise NotLogin.new
+									raise 'NotLogin'
 								when 120, 121
 									log('ReLinkFailure', Logger::ERROR)
 									raise
@@ -67,8 +67,6 @@ module WebQQProtocol
 								end
 							end
 						end
-					rescue NotLogin
-						# TODO
 					rescue Exception => ex
 						log(<<LOG.strip, Logger::ERROR)
 发生异常：[#{ex.class}] #{ex.message}，于
@@ -79,11 +77,10 @@ LOG
 							log("重试超过#{REDO_LIMIT}次，退出", Logger::FATAL)
 							raise
 						end
-						log('重试', Logger::ERROR)
+						log("第 #{redo_count} 次重试", Logger::ERROR)
 						redo
 					end
 				end
-				@thread.abort_on_exception = true
 			end
 
 			# 读取数据
@@ -101,6 +98,10 @@ notify_offfile
 =end
 			def data
 				@messages.pop
+			end
+			
+			def alive?
+				@thread.alive?
 			end
 
 			def log(message, level = Logger::INFO)

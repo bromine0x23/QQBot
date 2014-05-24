@@ -55,6 +55,7 @@ class QQBot
 
 		begin
 			loop do
+				raise 'offline' unless @client.online?
 				datas = @client.poll_data
 				log("data => #{datas}") if $-d
 				datas.each do |data|
@@ -93,7 +94,7 @@ class QQBot
 		@plugin_manager.plugin(plugin_name)
 	end
 
-	# @param [WebQQProtocol::QQEntity] from
+	# @param [WebQQProtocol::Entity] from
 	def plugins(from)
 		from.is_a?(WebQQProtocol::Group) ? @plugin_manager.filtered_plugins(from) : @plugin_manager.plugins
 	end
@@ -110,22 +111,22 @@ class QQBot
 		@plugin_manager.reload_plugins
 	end
 
-	# @param [WebQQProtocol::QQEntity] from
-	# @param [WebQQProtocol::QQEntity] sender
+	# @param [WebQQProtocol::Entity] from
+	# @param [WebQQProtocol::Entity] sender
 	# @param [PluginBase] plugin
 	def enable_plugin(from, sender, plugin)
 		@plugin_manager.enable_plugin(from, sender, plugin) if from.is_a? WebQQProtocol::Group
 	end
 
-	# @param [WebQQProtocol::QQEntity] from
-	# @param [WebQQProtocol::QQEntity] sender
+	# @param [WebQQProtocol::Entity] from
+	# @param [WebQQProtocol::Entity] sender
 	# @param [PluginBase] plugin
 	def disable_plugin(from, sender, plugin)
 		@plugin_manager.disable_plugin(from, sender, plugin) if from.is_a? WebQQProtocol::Group
 	end
 
-	# @param [WebQQProtocol::QQGroup] group
-	# @param [WebQQProtocol::QQGroupMember] member
+	# @param [WebQQProtocol::Group] group
+	# @param [WebQQProtocol::GroupMember] member
 	def group_manager?(group, member)
 		@masters.group_manager?(group, member) if group.is_a? WebQQProtocol::Group
 	end

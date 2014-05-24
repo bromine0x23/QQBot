@@ -160,33 +160,18 @@ module WebQQProtocol
 
 				@net.cookies.add!(cookie)
 
-				js_script = load_check
-
-				log("load_check -> #{js_script}", Logger::DEBUG) if $-d
-
-				/ptui_checkVC\('(?<need_verify>.*)','(?<verify_code>.*)','(?<encrypt_key>.*)'\);/ =~ js_script
+				/ptui_checkVC\('(?<need_verify>.*)','(?<verify_code>.*)','(?<encrypt_key>.*)'\);/ =~ load_check
 
 				need_verify, verify_code, encrypt_key = $~[:need_verify], $~[:verify_code], $~[:encrypt_key]
 
-				if $-d
-					log("need_verify -> #{need_verify}", Logger::DEBUG)
-					log("verify_code -> #{verify_code}", Logger::DEBUG)
-					log("encrypt_key -> #{encrypt_key}", Logger::DEBUG)
-				end
-
 				verify_code = get_verify_code if need_verify != '0'
 
-				js_script = load_login(verify_code, Utility.hash_password(password, verify_code, encrypt_key))
-
-				log("load_login -> #{js_script}", Logger::DEBUG) if $-d
-
-				/ptuiCB\('(?<state>.*)','.*','(?<address>.*)','.*','(?<info>.*)', '(?<nick>.*)'\);/ =~ js_script
+				/ptuiCB\('(?<state>.*)','.*','(?<address>.*)','.*','(?<info>.*)', '(?<nick>.*)'\);/ =~ load_login(verify_code, Utility.hash_password(password, verify_code, encrypt_key))
 
 				state, address, info, @nick = $~[:state], $~[:address], $~[:info].force_encoding('utf-8'), $~[:nick].force_encoding('utf-8')
 
 				case state
 				when '0'
-					@ptwebqq = @net.cookies['ptwebqq']
 					@net.uri_get(URI(address))
 					break
 				when '3'
@@ -202,6 +187,10 @@ module WebQQProtocol
 					raise LoginFailed.new(state, info.force_encoding('utf-8'))
 				end
 			end
+		end
+		
+		def ptwebqq
+			@net.cookies['ptwebqq']
 		end
 
 		def init_session
@@ -333,7 +322,7 @@ ptuiCB(state, _, address, _, info, nick);
 			https_post(
 				'd.web2.qq.com',
 				'/channel/login2',
-				ptwebqq: @ptwebqq,
+				ptwebqq: ptwebqq,
 				clientid: @clientid,
 				psessionid: @psessionid,
 				status: 'online',
@@ -358,7 +347,7 @@ ptuiCB(state, _, address, _, info, nick);
 				's.web2.qq.com',
 				'/api/get_user_friends2',
 				vfwebqq: @vfwebqq,
-				hash: Utility.hash_friends(@uin, @ptwebqq),
+				hash: Utility.hash_friends(@uin, ptwebqq),
 			)
 		end
 
@@ -643,6 +632,10 @@ ptuiCB(state, _, address, _, info, nick);
 
 		def poll_data
 			@receiver.data
+		end
+		
+		def online?
+			@sender.alive? and @receiver.alive?
 		end
 
 		def log(message, level = Logger::INFO)

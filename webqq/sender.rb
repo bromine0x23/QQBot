@@ -94,7 +94,6 @@ LOG
 						redo
 					end
 				end
-				@thread.abort_on_exception = true
 			end
 
 			# 发送好友消息
@@ -150,6 +149,10 @@ LOG
 						]
 					]
 				)
+			end
+			
+			def alive?
+				@thread.alive?
 			end
 
 			def log(message, level = Logger::INFO)

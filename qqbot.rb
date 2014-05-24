@@ -17,10 +17,6 @@ class QQBot
 		load_config
 
 		init_logger
-
-		init_client
-
-		load_plugins
 	end
 
 	def load_config
@@ -51,6 +47,10 @@ class QQBot
 	end
 
 	def run
+		init_client
+
+		load_plugins
+	
 		log('开始运行……')
 
 		begin
@@ -62,6 +62,12 @@ class QQBot
 					@plugin_manager.on_event(data)
 				end
 			end
+		rescue Exception => ex
+			log(<<LOG.strip, Logger::ERROR)
+发生异常：[#{ex.class}] #{ex.message}，于
+#{ex.backtrace.join("\n")}
+LOG
+			raise
 		ensure
 			stop
 		end

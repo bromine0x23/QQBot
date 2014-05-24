@@ -70,7 +70,6 @@ module WebQQProtocol
 			response = nil
 
 			if $-d
-				log('======== send ========', Logger::DEBUG)
 				log("Request URL: #{request.uri}", Logger::DEBUG)
 				log("Request Method: #{request.method}", Logger::DEBUG)
 				log("Request Header: \n#{request.to_hash.map { |key, value| "#{key}: #{value}" }.join("\n") }")
@@ -91,9 +90,10 @@ module WebQQProtocol
 			if $-d
 				log("Response Header: \n#{response.to_hash.map { |key, value| "#{key}: #{value}" }.join("\n")}")
 				log("Response Body: \n#{response.body}")
-				log('======== end ========', Logger::DEBUG)
 			end
+			
 			cookies.update!(response['set-cookie'])
+			
 			response
 		end
 

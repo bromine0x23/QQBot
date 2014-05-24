@@ -204,47 +204,67 @@ module WebQQProtocol
 		end
 
 		def init_entities
-			friend_data = require_friends
-			friend_list = Hash[
-				friend_data['marknames'].map! { |markname|
+			friends_data = require_friends
+			
+			friends_list = Hash[
+				friends_data['marknames'].map! { |markname|
 					[markname['uin'], markname['markname']]
 				}
 			].merge!(
 				Hash[
-					friend_data['info'].map! { |info|
+					friends_data['info'].map! { |info|
 						[info['uin'], info['nick']]
 					}
 				]
 			)
+			
 			@friends = Hash.new do |friends, uin|
 				friends[uin] = Friend.new(
 					uin,
-					friend_list[uin],
+					friends_list[uin],
 					require_number(uin, 1)['account'],
 				)
 			end
-
-			@groups = Hash[
-				require_groups['gnamelist'].map! { |gname|
-					[
-						gname['gid'],
-						Group.new(
-							gname['gid'],
-							gname['name'],
-							require_number(gname['code'], 4)['account'],
-							require_group_info(gname['code'])
-						) { |uin|
-							require_number(uin, 1)['account']
-						}
-					]
+			
+			on_number_require = proc do |uin|
+				require_number(uin, 1)['account']
+			end
+			
+			groups_data = require_groups
+			
+			groups_list = Hash[
+				groups_data['gnamelist'].map! { |gname|
+					[gname['gid'], gname]
 				}
 			]
-
-			@discusses = Hash[
-				require_discusses['dnamelist'].map! { |dname|
-					[dname['did'], Discuss.new(dname['din'], dname['nick'])]
+			
+			@groups = Hash.new do |groups, gid|
+				group = groups_list[gid]
+				groups[gid] = Group.new(
+					group['gid'],
+					group['name'],
+					require_number(group['code'], 4)['account'],
+					require_group_info(group['code']),
+					&on_number_require
+				)
+			end
+			
+			discusses_data = require_discusses
+			
+			discusses_list = Hash[
+				discusses_data['dnamelist'].map! { |dname|
+					[dname['did'], dname]
 				}
 			]
+			
+			@discusses = Hash.new do |discusses , did|
+				discuss = discusses_list[did]
+				discusses[did] = Discuss.new(
+					discuss['din'],
+					discuss['nick'],
+					&on_number_require
+				)
+			end
 		end
 
 		def init_thread

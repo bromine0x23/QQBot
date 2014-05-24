@@ -32,7 +32,7 @@ module WebQQProtocol
 
 		attr_reader :members
 
-		def initialize(uid, name, number, info, &on_uin_mismatch)
+		def initialize(uid, name, number, info, &on_number_require)
 			super(uid, name, number)
 
 			member_names = Hash[
@@ -51,35 +51,41 @@ module WebQQProtocol
 				members[uin] = GroupMember.new(
 					uin,
 					member_names[uin],
-					on_uin_mismatch.call(uin)
+					on_number_require.call(uin)
 				)
 			end
 		end
 
-		# @return [WebQQProtocol::QQGroupMember]
+		# @return [WebQQProtocol::GroupMember]
 		def member_by_uin(uin)
 			@members[uin]
 		end
 
-		# @return [WebQQProtocol::QQGroupMember]
+		# @return [WebQQProtocol::GroupMember]
 		def member_by_name(name)
 			@members.values.find do |member|
 				member.name == name
 			end
 		end
 
-		# @return [WebQQProtocol::QQGroupMember]
+		# @return [WebQQProtocol::GroupMember]
 		def member_by_number(number)
 			@members.values.find do |member|
 				member.number == number
 			end
 		end
 	end
+	
+	class DiscussMember < Entity
+		TYPE = '讨论组成员'
+	end
 
 	class Discuss < Entity
 		TYPE = '讨论组'
+		
+		attr_reader :members
 
-		def initialize(uin, name)
+		def initialize(uin, name, &on_number_require)
 			super(uin, name, 0)
 		end
 	end

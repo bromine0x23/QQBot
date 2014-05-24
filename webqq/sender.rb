@@ -98,7 +98,7 @@ LOG
 			# 发送好友消息
 			def send_buddy_message(uin, message, font)
 				@messages.push(
-					type: :buddy_message,
+					type: :message,
 					uin: uin,
 					message: message,
 					font: font

@@ -3,7 +3,7 @@
 
 require_relative 'qqbot'
 
-# $-d = true
+$-d = true
 
 qqbot = QQBot.new
 

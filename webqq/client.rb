@@ -138,7 +138,9 @@ module WebQQProtocol
 				@net.http_post(
 					host,
 					path,
-					r: JSON.fast_generate(data),
+					{
+						r: JSON.fast_generate(data)
+					},
 					referer_header(host)
 				)
 			)
@@ -150,7 +152,9 @@ module WebQQProtocol
 				@net.https_post(
 					host,
 					path,
-					r: JSON.fast_generate(data),
+					{
+						r: JSON.fast_generate(data)
+					},
 					referer_header(host)
 				)
 			)

@@ -69,11 +69,18 @@ module WebQQProtocol
 			request['cookie'] = cookies.to_s(request)
 			response = nil
 
+			use_http = request.uri.scheme == 'https'
+
 			if $-d
-				log("Request URL: #{request.uri}", Logger::DEBUG)
-				log("Request Method: #{request.method}", Logger::DEBUG)
-				log("Request Header: \n#{request.to_hash.map { |key, value| "#{key}: #{value}" }.join("\n") }")
-				log("Request Body: \n#{request.body}")
+				log(<<REQUEST.strip!, Logger::DEBUG)
+Request #{request}
+>> URL: #{request.uri}
+>> Method: #{request.method}
+>> Header:
+#{request.to_hash.map { |key, value| "#{key}: #{value}" }.join("\n") }
+>> Body:
+#{request.body}
+REQUEST
 			end
 
 			#noinspection RubyResolve
@@ -81,15 +88,20 @@ module WebQQProtocol
 				request.uri.host,
 				request.uri.port,
 				read_timeout: timeout,
-				use_ssl: request.uri.scheme == 'https',
-				verify_mode: OpenSSL::SSL::VERIFY_NONE
+				use_ssl: use_http,
+				verify_mode: use_http ? OpenSSL::SSL::VERIFY_NONE : nil
 			) do |http|
 				response = http.request(request)
 			end
 
 			if $-d
-				log("Response Header: \n#{response.to_hash.map { |key, value| "#{key}: #{value}" }.join("\n")}")
-				log("Response Body: \n#{response.body}")
+				log(<<RESPONSE.strip!, Logger::DEBUG)
+Response to #{request}
+>> Header:
+#{response.to_hash.map { |key, value| "#{key}: #{value}" }.join("\n")}
+>> Body:
+#{response.body}
+RESPONSE
 			end
 			
 			cookies.update!(response['set-cookie'])

@@ -50,14 +50,13 @@ class QQBot
 		init_client
 
 		load_plugins
-	
+
 		log('开始运行……')
 
 		begin
 			loop do
 				raise 'offline' unless @client.online?
 				datas = @client.poll_data
-				log("data => #{datas}") if $-d
 				datas.each do |data|
 					@plugin_manager.on_event(data)
 				end

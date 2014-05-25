@@ -12,7 +12,7 @@ module WebQQProtocol
 
 		# 消息发送线程
 		class Sender
-			REDO_LIMIT = 5
+			REDO_LIMIT = 10
 
 			attr_reader :thread
 
@@ -32,36 +32,24 @@ module WebQQProtocol
 
 					redo_count = 0
 
-					request_buddy = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_buddy_msg2'), net.header)
-					request_qun = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_qun_msg2'), net.header)
-					request_discuss = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_discu_msg2'), net.header)
-
 					message_counter = Random.rand(1000...10000) * 10000
 
-					data = {
-						to: nil,
-						group_uin: nil,
-						did: nil,
-						content: nil,
-						face: 555,
-						msg_id: nil,
-						clientid: clientid,
-						psessionid: psessionid
-					}
 					begin
 						loop do
 							message = @messages.pop
 							begin
+								data = {}
+
 								case message[:type]
 								when :buddy_message
 									data[:to] = message[:uin]
-									request = request_buddy
+									request = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_buddy_msg2'), net.header)
 								when :group_message
 									data[:group_uin] = message[:uin]
-									request = request_qun
+									request = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_qun_msg2'), net.header)
 								when :discuss_message
 									data[:did] = message[:uin]
-									request = request_discuss
+									request = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_discu_msg2'), net.header)
 								else
 									next
 								end
@@ -70,6 +58,9 @@ module WebQQProtocol
 
 								data[:content] = encode_content(message[:message], message[:font])
 								data[:msg_id] = message_counter
+								data[:face] = 555
+								data[:clientid] = clientid
+								data[:psessionid] = psessionid
 
 								request.set_form_data(r: JSON.fast_generate(data))
 
@@ -149,7 +140,7 @@ LOG
 					]
 				)
 			end
-			
+
 			def alive?
 				@thread.alive?
 			end

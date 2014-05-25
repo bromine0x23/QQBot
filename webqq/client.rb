@@ -268,7 +268,7 @@ module WebQQProtocol
 		end
 
 		def init_thread
-			@receiver = Receiver.new(ptwebqq, @clientid, @psessionid, @net, @logger)
+			@receiver = Receiver.new(@clientid, @psessionid, @net, @logger)
 			@sender = Sender.new(@clientid, @psessionid, @net, @logger)
 		end
 

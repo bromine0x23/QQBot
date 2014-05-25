@@ -13,7 +13,7 @@ module WebQQProtocol
 
 		# 消息接收线程
 		class Receiver
-			REDO_LIMIT = 5
+			REDO_LIMIT = 10
 
 			attr_reader :thread
 
@@ -21,50 +21,64 @@ module WebQQProtocol
 			#noinspection RubyScope
 			# @param [WebQQProtocol::Net] net
 			# @param [Logger] logger
-			def initialize(ptwebqq, clientid, psessionid, net, logger)
+			def initialize(clientid, psessionid, net, logger)
 				@logger = logger
 				@messages= Queue.new
 				@thread = Thread.new(
-					ptwebqq,
 					clientid,
 					psessionid,
 					net
-				) do |ptwebqq, clientid, psessionid, net|
+				) do |clientid, psessionid, net|
 					log('线程启动……', Logger::INFO)
-					
+
 					redo_count = 0
-					
-					request = Net::HTTP::Post.new(
-						URI('http://d.web2.qq.com/channel/poll2'),
-						net.header
-					)
-					request.set_form_data(
-						r: JSON.fast_generate(
-							ptwebqq: ptwebqq,
-							clientid: clientid,
-							psessionid: psessionid,
-							key: ''
-						)
-					)
-					
+
 					begin
 						loop do
 							begin
-								@messages.push(NetClient.json_result(net.send(request, 120).body))
+								request = Net::HTTP::Post.new(
+									URI('http://d.web2.qq.com/channel/poll2'),
+									net.header
+								)
+								request.set_form_data(
+									r: JSON.fast_generate(
+										ptwebqq: net.cookies['ptwebqq'],
+										clientid: clientid,
+										psessionid: psessionid,
+										key: ''
+									)
+								)
+
+								response = net.send(request, 120)
+
+								begin
+									@messages.push(NetClient.json_result(response.body))
+								rescue JSON::ParserError => ex
+									log(<<LOG.strip!, Logger::DEBUG)
+获取错误数据
+Request #{request}
+>> URL: #{request.uri}
+>> Method: #{request.method}
+>> Header:
+#{request.to_hash.map { |key, value| "#{key}: #{value}" }.join("\n") }
+>> Body:
+#{request.body}
+Response
+>> Header:
+#{response.to_hash.map { |key, value| "#{key}: #{value}" }.join("\n")}
+>> Body:
+#{response.body}
+LOG
+									raise
+								end
 							rescue ErrorCode => ex
 								case ex.retcode
 								when 102
 									next
 								when 116
 									# 重设 ptwebqq
-									request.set_form_data(
-										r: JSON.fast_generate(
-											ptwebqq: ex.data['p'],
-											clientid: clientid,
-											psessionid: psessionid,
-											key: ''
-										)
-									)
+									net.cookies['ptwebqq'] = ex.data['p']
+									next
 								when 100
 									# NotReLogin
 									raise 'NotLogin'
@@ -111,7 +125,7 @@ notify_offfile
 			def data
 				@messages.pop
 			end
-			
+
 			def alive?
 				@thread.alive?
 			end

@@ -11,7 +11,7 @@ require_relative 'sender'
 
 module WebQQProtocol
 
-	#noinspection RubyTooManyInstanceVariablesInspection
+	#noinspection RubyTooManyInstanceVariablesInspection,RubyTooManyMethodsInspection
 	class Client
 		attr_reader :qq, :nick
 		attr_reader :receiver, :sender
@@ -145,7 +145,7 @@ module WebQQProtocol
 		end
 
 		def init_client
-			@net = NetClient.new(@logger)
+			@net = NetClient.new
 
 			@net.header['User-Agent'] = Config::USER_AGENT
 
@@ -188,7 +188,7 @@ module WebQQProtocol
 				end
 			end
 		end
-		
+
 		def ptwebqq
 			@net.cookies['ptwebqq']
 		end
@@ -205,7 +205,7 @@ module WebQQProtocol
 
 		def init_entities
 			friends_data = require_friends
-			
+
 			friends_list = Hash[
 				friends_data['marknames'].map! { |markname|
 					[markname['uin'], markname['markname']]
@@ -217,7 +217,7 @@ module WebQQProtocol
 					}
 				]
 			)
-			
+
 			@friends = Hash.new do |friends, uin|
 				friends[uin] = Friend.new(
 					uin,
@@ -225,19 +225,19 @@ module WebQQProtocol
 					require_number(uin, 1)['account'],
 				)
 			end
-			
+
 			on_number_require = proc do |uin|
 				require_number(uin, 1)['account']
 			end
-			
+
 			groups_data = require_groups
-			
+
 			groups_list = Hash[
 				groups_data['gnamelist'].map! { |gname|
 					[gname['gid'], gname]
 				}
 			]
-			
+
 			@groups = Hash.new do |groups, gid|
 				group = groups_list[gid]
 				groups[gid] = Group.new(
@@ -248,16 +248,16 @@ module WebQQProtocol
 					&on_number_require
 				)
 			end
-			
+
 			discusses_data = require_discusses
-			
+
 			discusses_list = Hash[
 				discusses_data['dnamelist'].map! { |dname|
 					[dname['did'], dname]
 				}
 			]
-			
-			@discusses = Hash.new do |discusses , did|
+
+			@discusses = Hash.new do |discusses, did|
 				discuss = discusses_list[did]
 				discusses[did] = Discuss.new(
 					discuss['din'],
@@ -653,7 +653,7 @@ ptuiCB(state, _, address, _, info, nick);
 		def poll_data
 			@receiver.data
 		end
-		
+
 		def online?
 			@sender.alive? and @receiver.alive?
 		end

@@ -57,16 +57,14 @@ module WebQQProtocol
 
 		attr_accessor :header, :cookies
 
-		def initialize(logger)
+		def initialize()
 			@header = {}
 			@cookies = Cookies.new
-			@logger = logger
 
-			@request_logger = Logger.new('qqbot.log', File::WRONLY | File::APPEND | File::CREAT)
-			@request_logger.formatter = proc do |severity, datetime, prog_name, msg|
-				"[#{datetime}][#{severity}] #{msg}\n"
+			@logger = Logger.new('http_request.log', File::WRONLY | File::APPEND | File::CREAT)
+			@logger.formatter = proc do |severity, datetime, prog_name, msg|
+				"================> [#{datetime}][#{severity}] <================\n#{msg}\n"
 			end
-
 		end
 
 		# @param [Net::HTTPGenericRequest] request
@@ -77,7 +75,7 @@ module WebQQProtocol
 
 			use_http = request.uri.scheme == 'https'
 
-			@request_logger.log(Logger::INFO, <<REQUEST.strip!)
+			log(<<REQUEST)
 Request #{request}
 >> URL: #{request.uri}
 >> Method: #{request.method}
@@ -98,7 +96,7 @@ REQUEST
 				response = http.request(request)
 			end
 
-			@request_logger.log(Logger::INFO, <<RESPONSE.strip!)
+			log(<<RESPONSE)
 Response to #{request}
 >> Header:
 #{response.to_hash.map { |key, value| "#{key}: #{value}" }.join("\n")}

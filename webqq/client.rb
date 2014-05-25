@@ -100,13 +100,22 @@ module WebQQProtocol
 			friend_by_uin(uin) || group_by_uin(uin)
 		end
 
+		def referer_header(host)
+			{
+				'origin' => host,
+				'referer' => "http://#{host}/proxy.html?v=20130916001&callback=1&id=2"
+			}
+
+		end
+
 		# HTTP GET 请求，返回解析后的 json 数据的 result 键对应的值
 		def http_get(host, path, query)
 			NetClient.json_result(
 				@net.http_get(
 					host,
 					path,
-					query
+					query,
+					referer_header(host)
 				)
 			)
 		end
@@ -117,7 +126,8 @@ module WebQQProtocol
 				@net.https_get(
 					host,
 					path,
-					query
+					query,
+					referer_header(host)
 				)
 			)
 		end
@@ -128,7 +138,8 @@ module WebQQProtocol
 				@net.http_post(
 					host,
 					path,
-					r: JSON.fast_generate(data)
+					r: JSON.fast_generate(data),
+					referer_header(host)
 				)
 			)
 		end
@@ -139,7 +150,8 @@ module WebQQProtocol
 				@net.https_post(
 					host,
 					path,
-					r: JSON.fast_generate(data)
+					r: JSON.fast_generate(data),
+					referer_header(host)
 				)
 			)
 		end
@@ -194,8 +206,6 @@ module WebQQProtocol
 		end
 
 		def init_session
-			@net.header['Referer'] = Config::REFERER
-
 			@psessionid = ''
 
 			result = require_login

@@ -57,11 +57,11 @@ module WebQQProtocol
 
 		attr_accessor :header, :cookies
 
-		def initialize()
+		def initialize
 			@header = {}
 			@cookies = Cookies.new
 
-			@logger = Logger.new('http_request.log', File::WRONLY | File::APPEND | File::CREAT)
+			@logger = Logger.new('http_request.log', File::WRONLY | File::CREAT)
 			@logger.formatter = proc do |severity, datetime, prog_name, msg|
 				"================> [#{datetime}][#{severity}] <================\n#{msg}\n"
 			end
@@ -75,7 +75,8 @@ module WebQQProtocol
 
 			use_http = request.uri.scheme == 'https'
 
-			log(<<REQUEST)
+			if $-d
+				log(<<REQUEST)
 Request #{request}
 >> URL: #{request.uri}
 >> Method: #{request.method}
@@ -84,6 +85,7 @@ Request #{request}
 >> Body:
 #{request.body}
 REQUEST
+			end
 
 			#noinspection RubyResolve
 			Net::HTTP.start(
@@ -96,14 +98,16 @@ REQUEST
 				response = http.request(request)
 			end
 
-			log(<<RESPONSE)
+			if $-d
+				log(<<RESPONSE)
 Response to #{request}
 >> Header:
 #{response.to_hash.map { |key, value| "#{key}: #{value}" }.join("\n")}
 >> Body:
 #{response.body}
 RESPONSE
-			
+			end
+
 			cookies.update!(response['set-cookie'])
 			
 			response
@@ -111,21 +115,21 @@ RESPONSE
 
 		# @param [URI] uri
 		# @return [String]
-		def uri_get(uri)
+		def uri_get(uri, header = {})
 			send(
 				Net::HTTP::Get.new(
 					uri,
-					header
+					header.merge!(self.header)
 				)
 			).body
 		end
 
 		# @param [URI] uri
 		# @return [String]
-		def uri_post(uri, data = {})
+		def uri_post(uri, data = {}, header = {})
 			request = Net::HTTP::Post.new(
 				uri,
-				header
+				header.merge!(self.header)
 			)
 			request.set_form_data(data)
 			send(request).body
@@ -135,13 +139,14 @@ RESPONSE
 		# @param [String] path
 		# @param [Hash] query
 		# @return [String]
-		def get(generator, host, path, query = {})
+		def get(generator, host, path, query = {}, header = {})
 			uri_get(
 				generator.build(
 					host: host,
 					path: path,
 					query: URI.encode_www_form(query)
-				)
+				),
+				header
 			)
 		end
 
@@ -149,30 +154,31 @@ RESPONSE
 		# @param [String] path
 		# @param [String] data
 		# @return [String]
-		def post(generator, host, path, data = {})
+		def post(generator, host, path, data = {}, header = {})
 			uri_post(
 				generator.build(
 					host: host,
 					path: path,
 				),
-				data
+				data,
+				header
 			)
 		end
 
-		def http_get(host, path, query = {})
-			get(URI::HTTP, host, path, query)
+		def http_get(host, path, query = {}, header = {})
+			get(URI::HTTP, host, path, query, header)
 		end
 
-		def https_get(host, path, query)
-			get(URI::HTTPS, host, path, query)
+		def https_get(host, path, query, header = {})
+			get(URI::HTTPS, host, path, query, header)
 		end
 
-		def http_post(host, path, data)
-			post(URI::HTTP, host, path, data)
+		def http_post(host, path, data, header = {})
+			post(URI::HTTP, host, path, data, header)
 		end
 
-		def https_post(host, path, data)
-			post(URI::HTTPS, host, path, data)
+		def https_post(host, path, data, header = {})
+			post(URI::HTTPS, host, path, data, header)
 		end
 
 		def self.json_result(data)

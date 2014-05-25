@@ -36,9 +36,14 @@ module WebQQProtocol
 					begin
 						loop do
 							begin
+								header = net.header
+
+								header['origin'] = 'd.web2.qq.com'
+								header['referer'] = 'http://d.web2.qq.com/proxy.html?v=20130916001&callback=1&id=2'
+
 								request = Net::HTTP::Post.new(
 									URI('http://d.web2.qq.com/channel/poll2'),
-									net.header
+									header
 								)
 								request.set_form_data(
 									r: JSON.fast_generate(

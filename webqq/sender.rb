@@ -40,16 +40,21 @@ module WebQQProtocol
 							begin
 								data = {}
 
+								header = net.header
+
+								header['origin'] = 'd.web2.qq.com'
+								header['referer'] = 'http://d.web2.qq.com/proxy.html?v=20130916001&callback=1&id=2'
+
 								case message[:type]
 								when :buddy_message
 									data[:to] = message[:uin]
-									request = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_buddy_msg2'), net.header)
+									request = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_buddy_msg2'), header)
 								when :group_message
 									data[:group_uin] = message[:uin]
-									request = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_qun_msg2'), net.header)
+									request = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_qun_msg2'), header)
 								when :discuss_message
 									data[:did] = message[:uin]
-									request = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_discu_msg2'), net.header)
+									request = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_discu_msg2'), header)
 								else
 									next
 								end

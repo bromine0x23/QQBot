@@ -3,8 +3,6 @@
 
 require_relative 'qqbot'
 
-$-d = true
-
 qqbot = QQBot.new
 
 loop do
@@ -20,7 +18,7 @@ loop do
 		sleep(10)
 
 		restart += 1
-		if restart > 10
+		if restart > 16
 			puts '重启超过10次，退出'
 			break
 		end

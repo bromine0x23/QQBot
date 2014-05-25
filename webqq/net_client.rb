@@ -61,6 +61,12 @@ module WebQQProtocol
 			@header = {}
 			@cookies = Cookies.new
 			@logger = logger
+
+			@request_logger = Logger.new('qqbot.log', File::WRONLY | File::APPEND | File::CREAT)
+			@request_logger.formatter = proc do |severity, datetime, prog_name, msg|
+				"[#{datetime}][#{severity}] #{msg}\n"
+			end
+
 		end
 
 		# @param [Net::HTTPGenericRequest] request
@@ -71,8 +77,7 @@ module WebQQProtocol
 
 			use_http = request.uri.scheme == 'https'
 
-			if $-d
-				log(<<REQUEST.strip!, Logger::DEBUG)
+			@request_logger.log(Logger::INFO, <<REQUEST.strip!)
 Request #{request}
 >> URL: #{request.uri}
 >> Method: #{request.method}
@@ -81,7 +86,6 @@ Request #{request}
 >> Body:
 #{request.body}
 REQUEST
-			end
 
 			#noinspection RubyResolve
 			Net::HTTP.start(
@@ -94,15 +98,13 @@ REQUEST
 				response = http.request(request)
 			end
 
-			if $-d
-				log(<<RESPONSE.strip!, Logger::DEBUG)
+			@request_logger.log(Logger::INFO, <<RESPONSE.strip!)
 Response to #{request}
 >> Header:
 #{response.to_hash.map { |key, value| "#{key}: #{value}" }.join("\n")}
 >> Body:
 #{response.body}
 RESPONSE
-			end
 			
 			cookies.update!(response['set-cookie'])
 			

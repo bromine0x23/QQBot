@@ -54,22 +54,7 @@ module WebQQProtocol
 								begin
 									@messages.push(NetClient.json_result(response.body))
 								rescue JSON::ParserError => ex
-									log(<<LOG.strip!, Logger::DEBUG)
-获取错误数据
-Request #{request}
->> URL: #{request.uri}
->> Method: #{request.method}
->> Header:
-#{request.to_hash.map { |key, value| "#{key}: #{value}" }.join("\n") }
->> Body:
-#{request.body}
-Response
->> Header:
-#{response.to_hash.map { |key, value| "#{key}: #{value}" }.join("\n")}
->> Body:
-#{response.body}
-LOG
-									raise
+									next
 								end
 							rescue ErrorCode => ex
 								case ex.retcode

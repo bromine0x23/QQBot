@@ -25,16 +25,16 @@ MANUAL
 
 	COMMAND_HEADER = 'EVE'
 
-	COMMAND_MINERAL      = /^基础矿物$/
-	COMMAND_ITEM_INFO    = /^物品\s*(?<item_name>.+)/
+	COMMAND_MINERAL = /^基础矿物$/
+	COMMAND_ITEM_INFO = /^物品\s*(?<item_name>.+)/
 	COMMAND_STATION_INFO = /^空间站\s*(?<system_name>.+)/
-	COMMAND_SYSTEM_INFO  = /^星系\s*(?<system_name>.+)/
-	COMMAND_MARKET       = /^市场\s*(?<item_name>.+)/
+	COMMAND_SYSTEM_INFO = /^星系\s*(?<system_name>.+)/
+	COMMAND_MARKET = /^市场\s*(?<item_name>.+)/
 
 	URI_MINERAL = 'http://www.ceve-market.org/api/evemon'
 
 	JSON_KEY_BUY, JSON_KEY_SELL = 'buy', 'sell'
-	JSON_KEY_MAX, JSON_KEY_MIN  = 'max', 'min'
+	JSON_KEY_MAX, JSON_KEY_MIN = 'max', 'min'
 
 	XPATH_MINERAL = 'minerals/mineral'
 
@@ -107,11 +107,11 @@ RESPONSE
 			item_id = @db.get_first_value(SQL_SELECT_ITEM_ID, item_name)
 			if item_id
 				json_data = JSON.parse(Net::HTTP.get(URI("http://www.ceve-market.org/api/market/region/10000002/system/30000142/type/#{item_id}.json")))
-				buy  = json_data[JSON_KEY_BUY][JSON_KEY_MAX]
+				buy = json_data[JSON_KEY_BUY][JSON_KEY_MAX]
 				sell = json_data[JSON_KEY_SELL][JSON_KEY_MIN]
 				<<RESPONSE
 #{item_name} 吉他报价
-求购：#{buy  ? format_price( buy) : @responses[:no_price]} #{@units[:price]}
+求购：#{buy ? format_price(buy) : @responses[:no_price]} #{@units[:price]}
 出售：#{sell ? format_price(sell) : @responses[:no_price]} #{@units[:price]}
 RESPONSE
 			else
@@ -126,10 +126,10 @@ RESPONSE
 			item_name = $~[:item_name]
 			result = @db.get_first_row(SQL_SELECT_ITEM, item_name)
 			if result
-				item_id        = result[0]
-				description    = result[1]
-				volume         = result[2]
-				mass           = result[3]
+				item_id = result[0]
+				description = result[1]
+				volume = result[2]
+				mass = result[3]
 				marketgroup_id = result[4]
 				marketgroup_names = []
 				while marketgroup_id
@@ -147,7 +147,7 @@ RESPONSE
 市场分类：#{marketgroup_names.reverse!.join(' - ')}
 体积：#{volume} ㎥　质量：#{mass} ㎏
 描述：#{description}
-#{item_attributes.join("\n")}
+				#{item_attributes.join("\n")}
 RESPONSE
 			else
 				@responses[:no_item] % {item_name: item_name}
@@ -161,7 +161,7 @@ RESPONSE
 			system_name = $~[:system_name]
 			result = @db.execute(SQL_SELECT_STATION_NAMES, system_name)
 			if result
-				result.map!{|row| row[0]}.join("\n")
+				result.map! { |row| row[0] }.join("\n")
 			else
 				@responses[:no_system] % system_name
 			end
@@ -175,7 +175,7 @@ RESPONSE
 			result = @db.get_first_row(SQL_SELECT_SYSTEM, system_name)
 			if result
 				system_id = result[0]
-				security  = result[1]
+				security = result[1]
 				near_systems = ''
 				@db.execute(SQL_SELECT_NEAR_SYSTEMS, system_id) do |row|
 					near_systems << "#{row[0]} #{row[1]}\n"

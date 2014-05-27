@@ -105,7 +105,6 @@ module WebQQProtocol
 				'origin' => host,
 				'referer' => "http://#{host}/proxy.html?v=20130916001&callback=1&id=2"
 			}
-
 		end
 
 		# HTTP GET 请求，返回解析后的 json 数据的 result 键对应的值

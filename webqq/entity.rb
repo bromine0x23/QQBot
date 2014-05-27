@@ -9,7 +9,7 @@ module WebQQProtocol
 		attr_reader :uin, :name, :number
 
 		def initialize(uin, name, number)
-			@uin, @name, @number = uin || 0, (name || '').force_encoding('utf-8'), number || 0
+			@uin, @name, @number = uin || 0, name || '', number || 0
 		end
 
 		def to_s

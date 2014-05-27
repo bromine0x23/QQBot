@@ -24,25 +24,19 @@ module WebQQProtocol
 			def initialize(clientid, psessionid, net, logger)
 				@logger = logger
 				@messages= Queue.new
-				@thread = Thread.new(
-					clientid,
-					psessionid,
-					net
-				) do |clientid, psessionid, net|
+				@thread = Thread.new(clientid, psessionid, net) do |clientid, psessionid, net|
 					log('线程启动……', Logger::INFO)
-
 					redo_count = 0
-
 					begin
+						uri_poll = URI('http://d.web2.qq.com/channel/poll2')
 						loop do
+							retried = false
 							begin
 								header = net.header
-
 								header['origin'] = 'd.web2.qq.com'
 								header['referer'] = 'http://d.web2.qq.com/proxy.html?v=20130916001&callback=1&id=2'
-
 								request = Net::HTTP::Post.new(
-									URI('http://d.web2.qq.com/channel/poll2'),
+									uri_poll,
 									header
 								)
 								request.set_form_data(
@@ -53,14 +47,18 @@ module WebQQProtocol
 										key: ''
 									)
 								)
-
 								response = net.send(request, 120)
-
-								begin
-									@messages.push(NetClient.json_result(response.body))
-								rescue JSON::ParserError => ex
-									next
+							rescue Errno::ECONNRESET
+								unless retried
+									retried = true
+									retry
 								end
+							end
+							
+							begin
+								@messages.push(NetClient.json_result(response.body))
+							rescue JSON::ParserError => ex
+								next
 							rescue ErrorCode => ex
 								case ex.retcode
 								when 102
@@ -78,7 +76,7 @@ module WebQQProtocol
 								when 109, 110
 									next
 								else
-									log("poll时遭遇未知代码：#{ex.retcode}", Logger::FATAL)
+									log("遭遇错误代码：#{ex.retcode}", Logger::FATAL)
 									raise
 								end
 							end

@@ -23,11 +23,7 @@ module WebQQProtocol
 			def initialize(clientid, psessionid, net, logger)
 				@logger = logger
 				@messages= Queue.new
-				@thread = Thread.new(
-					clientid,
-					psessionid,
-					net
-				) do |clientid, psessionid, net|
+				@thread = Thread.new(clientid, psessionid, net) do |clientid, psessionid, net|
 					log('线程启动……', Logger::INFO)
 
 					redo_count = 0
@@ -35,45 +31,54 @@ module WebQQProtocol
 					message_counter = Random.rand(1000...10000) * 10000
 
 					begin
+						uri_buddy_message = URI('http://d.web2.qq.com/channel/send_buddy_msg2')
+						uri_group_message = URI('http://d.web2.qq.com/channel/send_qun_msg2')
+						uri_discuss_message = URI('http://d.web2.qq.com/channel/send_discu_msg2')
+					
 						loop do
 							message = @messages.pop
+							message_counter += 1
+
+							header = net.header
+							header['origin'] = 'd.web2.qq.com'
+							header['referer'] = 'http://d.web2.qq.com/proxy.html?v=20130916001&callback=1&id=2'
+							
+							data = {
+								content: message[:content],
+								msg_id: message_counter,
+								face: 555,
+								clientid: clientid,
+								psessionid: psessionid,
+							}
+
+							case message[:type]
+							when :buddy_message
+								data[:to] = message[:uin]
+								request = Net::HTTP::Post.new(uri_buddy_message, header)
+							when :group_message
+								data[:group_uin] = message[:uin]
+								request = Net::HTTP::Post.new(uri_group_message, header)
+							when :discuss_message
+								data[:did] = message[:uin]
+								request = Net::HTTP::Post.new(uri_discuss_message, header)
+							else
+								next
+							end
+
+							request.set_form_data(r: JSON.fast_generate(data))
+							
+							retried = false
 							begin
-								data = {}
-
-								header = net.header
-
-								header['origin'] = 'd.web2.qq.com'
-								header['referer'] = 'http://d.web2.qq.com/proxy.html?v=20130916001&callback=1&id=2'
-
-								case message[:type]
-								when :buddy_message
-									data[:to] = message[:uin]
-									request = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_buddy_msg2'), header)
-								when :group_message
-									data[:group_uin] = message[:uin]
-									request = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_qun_msg2'), header)
-								when :discuss_message
-									data[:did] = message[:uin]
-									request = Net::HTTP::Post.new(URI('http://d.web2.qq.com/channel/send_discu_msg2'), header)
-								else
-									next
-								end
-
-								message_counter += 1
-
-								data[:content] = encode_content(message[:message], message[:font])
-								data[:msg_id] = message_counter
-								data[:face] = 555
-								data[:clientid] = clientid
-								data[:psessionid] = psessionid
-
-								request.set_form_data(r: JSON.fast_generate(data))
-
-								NetClient.json_result(net.send(request).body)
+								response = net.send(request)
 							rescue EOFError
 								log('网络异常，无法发送消息，重试……', Logger::ERROR)
-								retry
+								unless retried
+									retried = true
+									retry
+								end
 							end
+							
+							NetClient.json_result(response.body)
 						end
 					rescue Exception => ex
 						log(<<LOG.strip, Logger::ERROR)
@@ -96,10 +101,8 @@ LOG
 				@messages.push(
 					type: :buddy_message,
 					uin: uin,
-					message: message,
-					font: font
+					content: encode_content(message, font)
 				)
-				self
 			end
 
 			# 发送群消息
@@ -107,10 +110,8 @@ LOG
 				@messages.push(
 					type: :group_message,
 					uin: uin,
-					message: message,
-					font: font
+					content: encode_content(message, font)
 				)
-				self
 			end
 
 			# 发送消息
@@ -118,10 +119,8 @@ LOG
 				@messages.push(
 					type: :discuss_message,
 					uin: uin,
-					message: message,
-					font: font
+					content: encode_content(message, font)
 				)
-				self
 			end
 
 			# 编码内容数据

@@ -24,9 +24,7 @@ module WebQQProtocol
 				@cookies.delete_if { |_, cookie| not cookie or (cookie.expires and cookie.expires < time) }
 				return unless str
 				WEBrick::Cookie.parse_set_cookies(str).each do |cookie|
-					unless cookie.expires and cookie.expires < time
-						@cookies[cookie.name] = cookie
-					end
+					@cookies[cookie.name] = cookie unless cookie.expires and cookie.expires < time
 				end
 			end
 

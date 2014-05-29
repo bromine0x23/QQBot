@@ -47,16 +47,12 @@ module WebQQProtocol
 										key: ''
 									)
 								)
-								response = net.send(request, 120)
+								@messages.push(NetClient.json_result(net.send(request, 120).body))
 							rescue Errno::ECONNRESET
 								unless retried
 									retried = true
 									retry
 								end
-							end
-							
-							begin
-								@messages.push(NetClient.json_result(response.body))
 							rescue JSON::ParserError => ex
 								next
 							rescue ErrorCode => ex

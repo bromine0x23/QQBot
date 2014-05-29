@@ -69,7 +69,7 @@ module WebQQProtocol
 							
 							retried = false
 							begin
-								response = net.send(request)
+								NetClient.json_result(net.send(request).body)
 							rescue EOFError
 								log('网络异常，无法发送消息，重试……', Logger::ERROR)
 								unless retried
@@ -78,7 +78,7 @@ module WebQQProtocol
 								end
 							end
 							
-							NetClient.json_result(response.body)
+							
 						end
 					rescue Exception => ex
 						log(<<LOG.strip, Logger::ERROR)

@@ -175,7 +175,7 @@ module WebQQProtocol
 
 				@net.cookies.add!(cookie)
 
-				/ptui_checkVC\('(?<need_verify>.*)','(?<verify_code>.*)','(?<encrypt_key>.*)'\);/ =~ load_check
+				/ptui_checkVC\('(?<need_verify>.*)','(?<verify_code>.*)','(?<encrypt_key>.*)', '.*'\);/ =~ load_check
 
 				need_verify, verify_code, encrypt_key = $~[:need_verify], $~[:verify_code], $~[:encrypt_key]
 

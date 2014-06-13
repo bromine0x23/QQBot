@@ -380,7 +380,7 @@ ptuiCB(state, _, address, _, info, nick);
 				's.web2.qq.com',
 				'/api/get_user_friends2',
 				vfwebqq: @vfwebqq,
-				hash: Utility.hash_friends(@uin, ptwebqq),
+				hash: Utility.hash_get(@uin, ptwebqq),
 			)
 		end
 
@@ -397,6 +397,7 @@ ptuiCB(state, _, address, _, info, nick);
 				's.web2.qq.com',
 				'/api/get_group_name_list_mask2',
 				vfwebqq: @vfwebqq,
+				hash: Utility.hash_get(@uin, ptwebqq),
 			)
 		end
 

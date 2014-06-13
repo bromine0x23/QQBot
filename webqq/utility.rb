@@ -14,25 +14,10 @@ module WebQQProtocol
 		def self.hash_get(uin, ptwebqq)
 			t = ''
 			n = ptwebqq + 'password error'
-			v = []
-			loop do
-				if t.length <= n.length
-					t << uin.to_s
-					break if t.length == n.length
-				else
-					t = t[0, n.length]
-					break
-				end
-			end
-			t.length.times do |i|
-				v[i] = t[i].ord ^ n[i].ord
-			end
-			n = '0123456789ABCDEF'
-			t = ''
-			v.each do |x|
-				t << n[x >> 4 & 15] << n[x & 15]
-			end
-			t
+			t << uin.to_s until t.length >= n.length
+			Array.new(n.length) { |i|
+				'%02X' % (t[i].ord ^ n[i].ord)
+			}.join
 		end
 
 		private

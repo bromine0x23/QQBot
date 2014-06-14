@@ -1,11 +1,9 @@
 ﻿# -*- coding: utf-8 -*-
 
-require 'sqlite3'
-
 class PluginCore < PluginNicknameResponderCombineFunctionBase
 	NAME = '核心插件'
 	AUTHOR = 'BR'
-	VERSION = '1.15'
+	VERSION = '1.16'
 	DESCRIPTION = 'QQBot核心'
 	MANUAL = <<MANUAL.strip
 ==> 系统插件 <==
@@ -21,13 +19,11 @@ MANUAL
 	def on_load
 		super
 		load_filter_list
-		# prepare_db
 	end
 
 	def on_unload
 		super
 		save_filter_list
-		# close_db
 	end
 
 	FILTER_FILE = file_path('pluginCore.filter')
@@ -42,80 +38,14 @@ MANUAL
 		end
 	end
 
-	DB_FILE = file_path('pluginCore.db')
-
-	SQL_CREATE_TABLE_MESSAGES = <<SQL
-CREATE TABLE IF NOT EXISTS messages (
-	id            INTEGER PRIMARY KEY AUTOINCREMENT,
-	sender_number INTEGER,
-	sender_name   TEXT,
-	message       TEXT,
-	created_at    TIMESTAMP
-)
-SQL
-
-	#noinspection RubyConstantNamingConvention
-	SQL_CREATE_TABLE_GROUP_MESSAGES = <<SQL
-CREATE TABLE IF NOT EXISTS group_messages (
-	id            INTEGER PRIMARY KEY AUTOINCREMENT,
-	from_number   INTEGER,
-	from_name     TEXT,
-	sender_number INTEGER,
-	sender_name   TEXT,
-	message       TEXT,
-	created_at    TIMESTAMP
-)
-SQL
-
-	SQL_INSERT_MESSAGE = <<SQL
-INSERT
-INTO messages (sender_number, sender_name, message, created_at)
-VALUES (?, ?, ?, ?)
-SQL
-
-	SQL_INSERT_GROUP_MESSAGE = <<SQL
-INSERT
-INTO group_messages (from_number, from_name, sender_number, sender_name, message, created_at)
-VALUES (?, ?, ?, ?, ?, ?)
-SQL
-
-	def prepare_db
-		@db = SQLite3::Database.open DB_FILE
-		@db.execute SQL_CREATE_TABLE_MESSAGES
-		@db.execute SQL_CREATE_TABLE_GROUP_MESSAGES
-	end
-
-	def close_db
-		@db.close
-	end
-
 	def on_message(sender, message, time)
-		#@db.transaction do |db|
-		#	db.execute(SQL_INSERT_MESSAGE, sender.number, sender.name, message, time.to_i)
-		#end
 		return true if @filter.include? sender.number
 		super
 	end
 
 	def on_group_message(from, sender, message, time)
-		#@db.transaction do |db|
-		#	db.execute(SQL_INSERT_GROUP_MESSAGE, from.number, from.name, sender.number, sender.name, message, time.to_i)
-		#end
 		return true if @filter.include? sender.number
 		super
-	end
-
-	JSON_KEY_TYPE = 'type'
-	JSON_KEY_ACCOUNT = 'account'
-	STRING_VERIFY_REQUIRED = 'verify_required'
-
-	def on_system_message(value)
-		super
-		if value[JSON_KEY_TYPE] == STRING_VERIFY_REQUIRED
-			friend = client.add_friend(value[JSON_KEY_ACCOUNT])
-			log("和#{friend.name}（#{friend.number}）成为了好友")
-			true
-		end
 	end
 
 	COMMAND_LIST_PLUGINS = '插件列表'
@@ -191,7 +121,7 @@ SQL
 		if COMMAND_OBJECT_CHECK == command
 			if qqbot.master?(sender)
 				result = ObjectSpace.count_objects
-				<<RESPONSE
+				<<RESPONSE.strip!
 Ｔｏｔａｌ：　　#{result[:TOTAL]}
 Ｆｒｅｅ：　　　#{result[:FREE]}
 Ｏｂｊｅｃｔ：　#{result[:T_OBJECT]}

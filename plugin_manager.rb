@@ -2,16 +2,27 @@
 
 require 'set'
 require 'yaml'
+require 'sqlite3'
 
 require_relative 'webqq/webqq'
 
 #noinspection RubyTooManyMethodsInspection
 class PluginManager
 	FILE_RULES = 'plugin_rules.yaml'
-	JSON_KEY_FROM_UIN  = 'from_uin'
-	JSON_KEY_SEND_UIN  = 'send_uin'
-	JSON_KEY_CONTENT   = 'content'
-	JSON_KEY_TIME      = 'time'
+
+	DB_FILE = 'receive_data.db'
+
+	SQL_CREATE_TABLE = <<SQL
+CREATE TABLE IF NOT EXISTS "receive" (
+	"id"        INTEGER PRIMARY KEY AUTOINCREMENT,
+	"poll_type" TEXT,
+	"value"     TEXT
+)
+SQL
+
+	SQL_INSERT_DATA = <<SQL
+INSERT OR IGNORE INTO "receive" ("poll_type", "value") VALUES (?, ?)
+SQL
 
 	attr_reader :plugins
 
@@ -22,12 +33,21 @@ class PluginManager
 		@client = client
 		@logger = logger
 		@plugins = []
+		@db = SQLite3::Database.open DB_FILE
+		@db.transaction do |db|
+			db.execute SQL_CREATE_TABLE
+		end
 	end
 
 	# @param [Hash] data
 	def on_event(data)
 		poll_type, value = data['poll_type'], data['value']
 		event     = :"on_#{poll_type}"
+
+		@db.transaction do |db|
+			db.execute(SQL_INSERT_DATA, poll_type, JSON.fast_generate(value))
+		end
+
 		send(event, value)
 	end
 

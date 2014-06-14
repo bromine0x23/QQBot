@@ -7,7 +7,6 @@ require_relative 'config'
 require_relative 'net_client'
 require_relative 'entity'
 require_relative 'receiver'
-require_relative 'sender'
 
 module WebQQProtocol
 
@@ -46,13 +45,14 @@ module WebQQProtocol
 
 			init_thread
 
+			@message_counter = Random.rand(1000...10000) * 10000
+
 			log('客户端建立成功')
 		end
 
 		def stop
 			@receiver.thread.kill
-			@sender.thread.kill
-			@net, @sender, @receiver = nil, nil, nil
+			@net, @receiver = nil, nil
 		end
 
 		# @return [WebQQProtocol::Friend]
@@ -282,7 +282,6 @@ module WebQQProtocol
 
 		def init_thread
 			@receiver = Receiver.new(@clientid, @psessionid, @net, @logger)
-			@sender = Sender.new(@clientid, @psessionid, @net, @logger)
 		end
 
 		# 校验账号
@@ -644,16 +643,93 @@ ptuiCB(state, _, address, _, info, nick);
 			)
 		end
 
-		def send_buddy_message(from, message, font = {})
-			@sender.send_buddy_message(from.uin, message.strip, font)
+		def send_buddy_message(uin, content)
+			@message_counter += 1
+			http_post(
+				'd.web2.qq.com',
+				'/channel/send_buddy_msg2',
+				content: content,
+				msg_id: @message_counter,
+				face: 555,
+				clientid: @clientid,
+				psessionid: @psessionid,
+				to: uin,
+			)
 		end
 
-		def send_group_message(from, message, font = {})
-			@sender.send_group_message(from.uin, message.strip, font)
+		def send_group_message(uin, content)
+			@message_counter += 1
+			http_post(
+				'd.web2.qq.com',
+				'/channel/send_qun_msg2',
+				content: content,
+				msg_id: @message_counter,
+				face: 555,
+				clientid: @clientid,
+				psessionid: @psessionid,
+				group_uin: uin,
+			)
 		end
 
-		def send_discuss_message(from, message, font = {})
+		def send_discuss_message(uin, content)
+			@message_counter += 1
+			http_post(
+				'd.web2.qq.com',
+				'/channel/send_discu_msg2',
+				content: content,
+				msg_id: @message_counter,
+				face: 555,
+				clientid: @clientid,
+				psessionid: @psessionid,
+				did: uin,
+			)
 			@sender.send_discuss_message(from.uin, message.strip, font)
+		end
+
+		def encode_content(message, font)
+			JSON.fast_generate(
+				[
+					message,
+					[
+						'font',
+						{
+							name: font[:name] || '宋体',
+							size: font[:size] || 10,
+							style: [
+								font[:bold] ? 1 : 0,
+								font[:italic] ? 1 : 0,
+								font[:underline] ? 1 : 0
+							],
+							color: font[:color] || '000000'
+						}
+					]
+				]
+			)
+		end
+
+		def send_message(from, message, font = {})
+			uin = from.uin
+			content = encode_content(message, font)
+
+			retried = false
+			begin
+				case from
+				when Friend
+					send_buddy_message(uin, content)
+				when Group
+					send_group_message(uin, content)
+				when Discuss
+					send_discuss_message(uin, content)
+				else
+					log("wrong from class: #{from.class}", Logger::ERROR)
+				end
+			rescue Exception
+				log('消息发送失败，重试……', Logger::ERROR)
+				unless retried
+					retried = true
+					retry
+				end
+			end
 		end
 
 		# 添加好友
@@ -669,7 +745,7 @@ ptuiCB(state, _, address, _, info, nick);
 		end
 
 		def online?
-			@sender.alive? and @receiver.alive?
+			@receiver.alive?
 		end
 
 		def log(message, level = Logger::INFO)

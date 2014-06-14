@@ -78,15 +78,7 @@ LOG
 	end
 
 	def send_message(from, message, font = {})
-		@client.send_message(from.uin, message.strip, @font_config.merge(font))
-	end
-
-	def send_group_message(from, message, font = {})
-		@client.send_group_message(from.uin, message.strip, @font_config.merge(font))
-	end
-
-	def send_discuss_message(from, message, font = {})
-		@client.send_discuss_message(from.uin, message.strip, @font_config.merge(font))
+		@client.send_message(from, message, @font_config.merge(font))
 	end
 
 	# @return [String]

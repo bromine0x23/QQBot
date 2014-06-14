@@ -131,7 +131,7 @@ class PluginResponderBase < PluginBase
 	# @param [Time] time
 	def on_message(sender, message, time)
 		response = deal_message(sender, message, time)
-		@client.send_buddy_message(sender, response) if response
+		@client.send_message(sender, response) if response
 	end
 
 	# @param [WebQQProtocol::Group] from
@@ -140,7 +140,7 @@ class PluginResponderBase < PluginBase
 	# @param [Time] time
 	def on_group_message(from, sender, message, time)
 		response = deal_group_message(from, sender, message, time)
-		@client.send_group_message(from, response) if response
+		@client.send_message(from, response) if response
 	end
 
 	# @param [WebQQProtocol::Friend] sender

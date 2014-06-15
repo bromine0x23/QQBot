@@ -196,6 +196,7 @@ RESPONSE
 	# @param [WebQQProtocol::QQEntity] from
 	# @param [WebQQProtocol::QQEntity] sender
 	# @param [String] command
+=begin
 	def function_filter_add(from, sender, command, _)
 		if COMMAND_FILTER_ADD =~ command
 			if qqbot.master?(sender) or qqbot.group_manager?(from, sender)
@@ -210,10 +211,12 @@ RESPONSE
 			end
 		end
 	end
+=end
 
 	# @param [WebQQProtocol::QQEntity] from
 	# @param [WebQQProtocol::QQEntity] sender
 	# @param [String] command
+=begin
 	def function_filter_remove(from, sender, command, _)
 		if COMMAND_FILTER_REMOVE =~ command
 			if qqbot.master?(sender) or qqbot.group_manager?(from, sender)
@@ -228,6 +231,7 @@ RESPONSE
 			end
 		end
 	end
+=end
 
 	# @param [String] command
 	def function_plugin_manual(_, _, command, _)

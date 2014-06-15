@@ -709,7 +709,7 @@ ptuiCB(state, _, address, _, info, nick);
 
 		def send_message(from, message, font = {})
 			uin = from.uin
-			content = encode_content(message, font)
+			content = encode_content(message.strip, font)
 
 			retried = false
 			begin

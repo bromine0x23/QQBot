@@ -23,6 +23,7 @@ doc/
 # 配置文件
 *.config
 *.yaml
+*.filter
 
 # 数据库文件
 *.db

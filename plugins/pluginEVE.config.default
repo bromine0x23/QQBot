@@ -2,8 +2,35 @@
 :units:
   :price: ISK
 :thousand_separator: ','
+:duplicate_display_door: 8
 :responses:
   :no_price: 暂无出价
-  :no_item: 不存在物品：%s
-  :no_system: 不存在星系：%s
-  :no_constellation: 不存在星座：%s
+  :display_price: |-
+    %{type_name}
+    %{type_name_zh}
+    %{type_name_ja}
+    吉他报价
+    求购：%{buy_price}
+    出售：%{sell_price}
+  :no_item: 不存在物品：%{item_name}
+  :display_system: |-
+    %{system_name}
+    %{system_name_zh}
+    属于 %{faction_name} 势力
+    安全等级：%{security}
+  :no_system: 不存在星系：%{system_name}
+  :display_faction: |-
+    %{faction_name}
+    %{faction_name_zh}
+    %{faction_name_ja}
+    拥有 %{station_count} 座空间站
+    %{description}
+  :no_faction: 不存在势力：%{faction_name}
+  :no_constellation: 不存在星座：%{constellation_name}
+  :duplicate_item: |-
+    搜索结果存在多件物品：
+    %{type_names}
+  :duplicate_item_more: |-
+    搜索结果存在多件物品：
+    %{type_names}
+    等

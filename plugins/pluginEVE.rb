@@ -12,7 +12,7 @@ require 'rexml/document'
 class PluginEVE < PluginNicknameResponderCombineFunctionBase
 	NAME = 'EVE插件'
 	AUTHOR = 'BR'
-	VERSION = '1.9'
+	VERSION = '2.0'
 	DESCRIPTION = '我们的征途的星辰大海'
 	MANUAL = <<MANUAL.strip
 == 吉他价格查询 ==
@@ -26,15 +26,12 @@ MANUAL
 	COMMAND_HEADER = 'EVE'
 
 	COMMAND_MINERAL = /^基础矿物$/
-	COMMAND_ITEM_INFO = /^物品\s*(?<item_name>.+)/
 	COMMAND_STATION_INFO = /^空间站\s*(?<system_name>.+)/
 	COMMAND_SYSTEM_INFO = /^星系\s*(?<system_name>.+)/
+	COMMAND_FACTION_INFO = /^势力\s*(?<faction_name>.+)/
 	COMMAND_MARKET = /^市场\s*(?<item_name>.+)/
 
 	URI_MINERAL = 'http://www.ceve-market.org/api/evemon'
-
-	JSON_KEY_BUY, JSON_KEY_SELL = 'buy', 'sell'
-	JSON_KEY_MAX, JSON_KEY_MIN = 'max', 'min'
 
 	XPATH_MINERAL = 'minerals/mineral'
 
@@ -42,34 +39,40 @@ MANUAL
 
 	DB_FILE = file_path('pluginEVE.db')
 
-	SQL_SELECT_ITEM_ID = <<SQL
-SELECT id FROM items WHERE name = ?
+	SQL_SELECT_ITEM_TYPE = <<SQL
+SELECT "typeID", "typeName", "typeName_ZH", "typeName_JA"
+	FROM "marketTypes"
+	WHERE "typeName_ZH" = ?
 SQL
 
-	SQL_SELECT_ITEM = <<SQL
-SELECT id, description, volume, mass, marketgroup_id FROM items WHERE name = ?
+	SQL_SELECT_ITEM_TYPES = <<SQL
+SELECT "typeID", "typeName", "typeName_ZH", "typeName_JA"
+	FROM "marketTypes"
+	WHERE "typeName_ZH" LIKE ?
 SQL
 
-	SQL_SELECT_MARKETGROUP = <<SQL
-SELECT name, parent_id FROM marketgroups WHERE id = ?
+	SQL_SELECT_STATIONS = <<SQL
+SELECT "stationName", "stationName_ZH"
+	FROM "stations"
+	WHERE "solarSystemID" = (
+		SELECT "solarSystemID"
+			FROM "solarSystems"
+			WHERE "solarSystemName_ZH" = ?
+	)
 SQL
 
-	SQL_SELECT_ITEM_ATTRIBUTES = <<SQL
-SELECT attributes.name, item_attributes.value, units.name
-FROM item_attributes, attributes, units
-WHERE item_attributes.item_id = ? AND item_attributes.attribute_id = attributes.id AND attributes.unit_id = units.id
+	SQL_SELECT_SOLAR_SYSTEM = <<SQL
+SELECT "solarSystemName", "solarSystemName_ZH", "factions"."factionName_ZH", "security"
+	FROM "solarSystems"
+		JOIN "factions"
+			ON "solarSystems"."factionID" = "factions"."factionID"
+	WHERE "solarSystemName_ZH" = ?
 SQL
 
-	SQL_SELECT_STATION_NAMES = <<SQL
-SELECT name FROM stations WHERE system_id = (SELECT id FROM systems WHERE name = ?)
-SQL
-
-	SQL_SELECT_SYSTEM = <<SQL
-SELECT id, security FROM systems WHERE name = ?
-SQL
-
-	SQL_SELECT_NEAR_SYSTEMS = <<SQL
-SELECT name, security FROM systems WHERE id IN (SELECT to_id FROM system_jumps WHERE from_id = ?)
+	SQL_SELECT_FACTION = <<SQL
+SELECT "factionName", "factionName_ZH", "factionName_JA",  "stationCount", "description_ZH"
+	FROM "factions"
+	WHERE "factionName_ZH" LIKE ?
 SQL
 
 	def on_load
@@ -101,56 +104,46 @@ RESPONSE
 	end
 
 	#noinspection RubyResolve
-	def function_market(_, _, command, _)
-		if COMMAND_MARKET =~ command
-			item_name = $~[:item_name]
-			item_id = @db.get_first_value(SQL_SELECT_ITEM_ID, item_name)
-			if item_id
-				json_data = JSON.parse(Net::HTTP.get(URI("http://www.ceve-market.org/api/market/region/10000002/system/30000142/type/#{item_id}.json")))
-				buy = json_data[JSON_KEY_BUY][JSON_KEY_MAX]
-				sell = json_data[JSON_KEY_SELL][JSON_KEY_MIN]
-				<<RESPONSE
-#{item_name} 吉他报价
-求购：#{buy ? format_price(buy) : @responses[:no_price]} #{@units[:price]}
-出售：#{sell ? format_price(sell) : @responses[:no_price]} #{@units[:price]}
-RESPONSE
-			else
-				@responses[:no_item] % {item_name: item_name}
-			end
-		end
+	def format_market_result(type_id, type_name, type_name_zh, type_name_ja)
+		json_data = JSON.parse(
+			Net::HTTP.get(
+				URI("http://www.ceve-market.org/api/market/region/10000002/system/30000142/type/#{type_id}.json")
+			)
+		)
+		buy = json_data['buy']['max']
+		sell = json_data['sell']['min']
+		@responses[:display_price] % {
+			type_name: type_name,
+			type_name_zh: type_name_zh,
+			type_name_ja: type_name_ja,
+			buy_price: buy ? format_price(buy) + @units[:price] : @responses[:no_price],
+			sell_price: sell ? format_price(sell) + @units[:price] : @responses[:no_price],
+		}
 	end
 
 	#noinspection RubyResolve
-	def function_item_info(_, _, command, _)
-		if COMMAND_ITEM_INFO =~ command
+	def function_market(_, _, command, _)
+		if COMMAND_MARKET =~ command
 			item_name = $~[:item_name]
-			result = @db.get_first_row(SQL_SELECT_ITEM, item_name)
-			if result
-				item_id = result[0]
-				description = result[1]
-				volume = result[2]
-				mass = result[3]
-				marketgroup_id = result[4]
-				marketgroup_names = []
-				while marketgroup_id
-					@db.execute(SQL_SELECT_MARKETGROUP, marketgroup_id) do |row|
-						marketgroup_names << row[0]
-						marketgroup_id = row[1]
+			types = @db.get_first_row(SQL_SELECT_ITEM_TYPE, item_name)
+			if types
+				format_market_result(*types)
+			else
+				types = @db.execute(SQL_SELECT_ITEM_TYPES, item_name + '%')
+
+				case types.length
+				when 0
+					@responses[:no_item] % {item_name: item_name}
+				when 1
+					format_market_result(*types[0])
+				else
+					type_names = types.map! {|type| type[2]}
+					if type_names.length > @duplicate_display_door
+						@responses[:duplicate_item_more] % {type_names:  type_names.first(@duplicate_display_door).join("\n")}
+					else
+						@responses[:duplicate_item] % {type_names: type_names.join("\n")}
 					end
 				end
-				item_attributes = []
-				@db.execute(SQL_SELECT_ITEM_ATTRIBUTES, item_id) do |row|
-					item_attributes << "#{row[0]}：#{row[1]} #{row[2]}"
-				end
-				<<RESPONSE
-#{item_name}
-市场分类：#{marketgroup_names.reverse!.join(' - ')}
-体积：#{volume} ㎥　质量：#{mass} ㎏
-描述：#{description}
-				#{item_attributes.join("\n")}
-RESPONSE
-			else
-				@responses[:no_item] % {item_name: item_name}
 			end
 		end
 	end
@@ -159,35 +152,51 @@ RESPONSE
 	def function_station_info(_, _, command, _)
 		if COMMAND_STATION_INFO =~ command
 			system_name = $~[:system_name]
-			result = @db.execute(SQL_SELECT_STATION_NAMES, system_name)
-			if result
-				result.map! { |row| row[0] }.join("\n")
+			stations = @db.execute(SQL_SELECT_STATIONS, system_name)
+			if stations.empty?
+				@responses[:no_system] % {system_name: system_name}
 			else
-				@responses[:no_system] % system_name
+				@responses[:display_stations] % {
+					system_name: system_name,
+					station_names: stations.map! { |row| "#{row[0]}\n　#{row[1]}" }.join("\n"),
+				}
 			end
 		end
 	end
 
 	#noinspection RubyResolve
-	def function_system_info(_, _, command, _)
+	def function_solar_system_info(_, _, command, _)
 		if COMMAND_SYSTEM_INFO =~ command
 			system_name = $~[:system_name]
-			result = @db.get_first_row(SQL_SELECT_SYSTEM, system_name)
-			if result
-				system_id = result[0]
-				security = result[1]
-				near_systems = ''
-				@db.execute(SQL_SELECT_NEAR_SYSTEMS, system_id) do |row|
-					near_systems << "#{row[0]} #{row[1]}\n"
-				end
-				<<RESPONSE
-#{system_name}
-安等：#{security}
-相邻星系：
-#{near_systems.empty? ? '无' : near_systems}
-RESPONSE
+			system = @db.get_first_row(SQL_SELECT_SOLAR_SYSTEM, system_name)
+			if system
+				@responses[:display_system] % {
+					system_name: system[0],
+					system_name_zh: system[1],
+					faction_name: system[2],
+					security: system[3],
+				}
 			else
 				@responses[:no_system] % {system_name: system_name}
+			end
+		end
+	end
+
+	#noinspection RubyResolve
+	def function_faction_info(_, _, command, _)
+		if COMMAND_FACTION_INFO =~ command
+			faction_name = $~[:faction_name]
+			faction = @db.get_first_row(SQL_SELECT_FACTION, faction_name + '%')
+			if faction
+				@responses[:display_faction] % {
+					faction_name: faction[0],
+					faction_name_zh: faction[1],
+					faction_name_ja: faction[2],
+					station_count: faction[3],
+					description: faction[4],
+				}
+			else
+				@responses[:no_faction] % {faction_name: faction_name}
 			end
 		end
 	end

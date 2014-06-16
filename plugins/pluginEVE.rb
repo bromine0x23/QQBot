@@ -12,7 +12,7 @@ require 'rexml/document'
 class PluginEVE < PluginNicknameResponderCombineFunctionBase
 	NAME = 'EVE插件'
 	AUTHOR = 'BR'
-	VERSION = '2.0'
+	VERSION = '2.1'
 	DESCRIPTION = '我们的征途的星辰大海'
 	MANUAL = <<MANUAL.strip
 == 吉他价格查询 ==
@@ -42,13 +42,13 @@ MANUAL
 	SQL_SELECT_ITEM_TYPE = <<SQL
 SELECT "typeID", "typeName", "typeName_ZH", "typeName_JA"
 	FROM "marketTypes"
-	WHERE "typeName_ZH" = ?
+	WHERE "typeName" = ?1 OR "typeName_ZH" = ?1 OR "typeName_JA" = ?1
 SQL
 
 	SQL_SELECT_ITEM_TYPES = <<SQL
 SELECT "typeID", "typeName", "typeName_ZH", "typeName_JA"
 	FROM "marketTypes"
-	WHERE "typeName_ZH" LIKE ?
+	WHERE "typeName" LIKE ?1  OR "typeName_ZH" LIKE ?1 OR "typeName_JA" LIKE ?1
 SQL
 
 	SQL_SELECT_STATIONS = <<SQL
@@ -57,7 +57,7 @@ SELECT "stationName", "stationName_ZH"
 	WHERE "solarSystemID" = (
 		SELECT "solarSystemID"
 			FROM "solarSystems"
-			WHERE "solarSystemName_ZH" = ?
+			WHERE "solarSystemName" = ?1 OR "solarSystemName_ZH" = ?1
 	)
 SQL
 
@@ -66,13 +66,13 @@ SELECT "solarSystemName", "solarSystemName_ZH", "factions"."factionName_ZH", "se
 	FROM "solarSystems"
 		JOIN "factions"
 			ON "solarSystems"."factionID" = "factions"."factionID"
-	WHERE "solarSystemName_ZH" = ?
+	WHERE "solarSystemName" = ?1 OR "solarSystemName_ZH" = ?1
 SQL
 
 	SQL_SELECT_FACTION = <<SQL
 SELECT "factionName", "factionName_ZH", "factionName_JA",  "stationCount", "description_ZH"
 	FROM "factions"
-	WHERE "factionName_ZH" LIKE ?
+	WHERE "factionName" LIKE ?1 OR "factionName_ZH" LIKE ?1
 SQL
 
 	def on_load

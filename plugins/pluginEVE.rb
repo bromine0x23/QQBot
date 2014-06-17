@@ -12,32 +12,21 @@ require 'rexml/document'
 class PluginEVE < PluginNicknameResponderCombineFunctionBase
 	NAME = 'EVE插件'
 	AUTHOR = 'BR'
-	VERSION = '2.2'
+	VERSION = '2.4'
 	DESCRIPTION = '我们的征途的星辰大海'
 	MANUAL = <<MANUAL.strip
 == 吉他价格查询 ==
-EVE 市场 <物品>
-EVE 基础矿物
-EVE 物品 <物品>
-EVE 空间站 <星系>
+EVE 星系 <星系> # 查询星系信息
+EVE 空间站 <空间站> # 查询空间站信息
+EVE 势力 <势力> # 查询势力信息
+EVE 种族 <种族> # 查询种族信息
+EVE 物品 <物品> # 查询物品信息
+EVE 市场 <物品> # 查询物品市场价格
+EVE 矿物 # 查询市场矿物价格
 MANUAL
 	PRIORITY = 0
 
 	COMMAND_HEADER = 'EVE'
-
-	COMMAND_MINERAL = /^基础矿物$/
-	COMMAND_ITEM_INFO = /^物品\s*(?<item_name>.+)/
-	COMMAND_STATION_INFO = /^空间站\s*(?<system_name>.+)/
-	COMMAND_SYSTEM_INFO = /^星系\s*(?<system_name>.+)/
-	COMMAND_FACTION_INFO = /^势力\s*(?<faction_name>.+)/
-	COMMAND_RACE_INFO = /^种族\s*(?<race_name>.+)/
-	COMMAND_MARKET = /^市场\s*(?<item_name>.+)/
-
-	URI_MINERAL = 'http://www.ceve-market.org/api/evemon'
-
-	XPATH_MINERAL = 'minerals/mineral'
-
-	PATTERN_THOUSAND_SEPARATOR = /(?<=\d)(?=(\d\d\d)+\.)/
 
 	DB_FILE = file_path('pluginEVE.db')
 
@@ -53,14 +42,14 @@ MANUAL
 
 	#noinspection RubyResolve
 	def format_price(price)
-		price.round(2).to_s.gsub(PATTERN_THOUSAND_SEPARATOR, @thousand_separator)
+		price.round(2).to_s.gsub(/(?<=\d)(?=(\d\d\d)+\.)/, @thousand_separator)
 	end
 
 	#noinspection RubyResolve
 	def function_mineral(_, _, command, _)
-		if COMMAND_MINERAL =~ command
+		if /^矿物$/ =~ command
 			response = ''
-			REXML::Document.new(Net::HTTP.get(URI(URI_MINERAL))).each_element(XPATH_MINERAL) do |element|
+			REXML::Document.new(Net::HTTP.get(URI('http://www.ceve-market.org/api/evemon'))).each_element('minerals/mineral') do |element|
 				response << <<RESPONSE
 #{element[0].text}：#{format_price(element[1].text)} #{@units[:price]}
 RESPONSE
@@ -70,83 +59,358 @@ RESPONSE
 	end
 
 	#noinspection RubyResolve
-	def item_info(type_id, type_name, type_name_zh, type_name_ja, description, mass, volume)
-		attributes = @db.execute(<<SQL, type_id)
-SELECT "attributes"."displayName_ZH", "value", "units"."displayName_ZH"
+	def solar_system_info(solar_system_id, solar_system_name, solar_system_name_zh, faction_name, faction_name_zh, faction_name_ja, security)
+		station_names = @db.execute(<<SQL, solar_system_id)
+SELECT
+	"stationName", "stationName_ZH"
 FROM
-	"typeAttributes"
-	JOIN "attributes"
-		ON "typeAttributes"."attributeID" = "attributes"."attributeID"
-	JOIN "units"
-		ON "attributes"."unitID" = "units"."unitID"
+	"stations"
 WHERE
-	"typeAttributes"."typeID" = ?1
-	AND "attributes"."displayName_ZH" IS NOT NULL
+	"solarSystemID" = ?1
 SQL
-		@responses[:display_item] % {
-			type_name: type_name,
-			type_name_zh: type_name_zh,
-			type_name_ja: type_name_ja,
-			description: description,
-			mass: mass,
-			volume: volume,
-			attributes: attributes.map{ |attribute_name, value, unit_name| "#{attribute_name}：#{value} #{unit_name}"}.join("\n"),
+		@responses[:display_solar_system] % {
+			solar_system_name:
+				@format[:solar_system_name] % {
+					solar_system_name: solar_system_name,
+					solar_system_name_zh: solar_system_name_zh
+				},
+			faction_name: (
+			if faction_name
+				@format[:faction_name] % {
+					faction_name: faction_name,
+					faction_name_zh: faction_name_zh,
+					faction_name_ja: faction_name_ja
+				}
+			else
+				@format[:faction_name_none]
+			end
+			),
+			security: security,
+			station_names: (
+				if station_names.empty?
+					@format[:station_names_none]
+				else
+					station_names.map! { |station_name, station_name_zh|
+						@format[:station_name] % {
+							station_name: station_name,
+							station_name_zh: station_name_zh
+						}
+					}.join("\n")
+				end
+			)
+		}
+	end
+
+	#noinspection RubyResolve,RubyScope
+	def function_solar_system_info(_, _, command, _)
+		if /^星系\s*(?<query_name>.+)/ =~ command
+			solar_system = @db.get_first_row(<<SQL, query_name)
+SELECT
+	"solarSystemID",
+	"solarSystemName", "solarSystemName_ZH",
+	"factionName", "factionName_ZH", "factionName_JA",
+	"security"
+FROM
+	"solarSystems" LEFT JOIN "factions" ON "solarSystems"."factionID" = "factions"."factionID"
+WHERE
+	"solarSystemName" = ?1 OR "solarSystemName_ZH" = ?1
+SQL
+			if solar_system
+				solar_system_info(*solar_system)
+			else
+				solar_systems = @db.execute(<<SQL, query_name + '%')
+SELECT
+	"solarSystemID",
+	"solarSystemName", "solarSystemName_ZH",
+	"factionName", "factionName_ZH", "factionName_JA",
+	"security"
+FROM
+	"solarSystems" LEFT JOIN "factions" ON "solarSystems"."factionID" = "factions"."factionID"
+WHERE
+	"solarSystemName" LIKE ?1 OR "solarSystemName_ZH" LIKE ?1
+SQL
+				case solar_systems.size
+				when 0
+					@responses[:no_query_solar_system] % {query_name: query_name}
+				when 1
+					solar_system_info(*solar_systems.first)
+				else
+					solar_system_names = solar_systems.sample(@duplicate_display_door).map do |_, solar_system_name, solar_system_name_zh, _|
+						@format[:solar_system_name] % {
+							solar_system_name: solar_system_name,
+							solar_system_name_zh: solar_system_name_zh
+						}
+					end
+					@responses[
+						if solar_systems.length > @duplicate_display_door
+							:duplicate_solar_system_more
+						else
+							:duplicate_solar_system
+						end
+					] % {
+						solar_system_names: solar_system_names.join("\n")
+					}
+				end
+
+			end
+		end
+	end
+
+	#noinspection RubyResolve
+	def station_info(station_id, station_name, station_name_zh, operation_id, operation_name, operation_name_zh, operation_name_ja)
+		service_names = @db.execute(<<SQL, operation_id)
+SELECT
+	"serviceName", "serviceName_ZH", "serviceName_JA"
+FROM
+	"operationServices" JOIN "services" ON "operationServices"."serviceID" = "services"."serviceID"
+WHERE
+	"operationID" = ?1
+SQL
+		@responses[:display_station] % {
+			station_name: @format[:station_name] % {
+				station_name: station_name,
+				station_name_zh: station_name_zh
+			},
+			operation_name: @format[:operation_name] % {
+				operation_name: operation_name,
+				operation_name_zh: operation_name_zh,
+				operation_name_ja: operation_name_ja
+			},
+			service_names: service_names.map! { |service_name, service_name_zh, service_name_ja|
+				@format[:service_name] % {
+					service_name: service_name,
+					service_name_zh: service_name_zh,
+					service_name_ja: service_name_ja,
+				}
+			}.join(' ／ ')
 		}
 	end
 
 	#noinspection RubyResolve
-	def function_item_info(_, _, command, _)
-		if COMMAND_ITEM_INFO =~ command
-			item_name = $~[:item_name]
-			types = @db.get_first_row(<<SQL, item_name)
+	def function_station_info(_, _, command, _)
+		if /^空间站\s*(?<query_name>.+)/ =~ command
+			station = @db.get_first_row(<<SQL, query_name)
 SELECT
-	"typeID",
-	"typeName",
-	"typeName_ZH",
-	"typeName_JA",
-	"description_ZH",
-	"mass",
-	"volume"
+	"stationID",
+	"stationName", "stationName_ZH",
+	"stations"."operationID",
+	"operationName", "operationName_ZH", "operationName_JA"
 FROM
-	"types"
+	"stations" JOIN "operations" ON "stations"."operationID" = "operations"."operationID"
 WHERE
-	"typeName" = ?1
-	OR "typeName_ZH" = ?1
-	OR "typeName_JA" = ?1
+	"stationName" = ?1 OR "stationName_ZH" = ?1
 SQL
-			if types
-				item_info(*types)
+			if station
+				station_info(*station)
 			else
-				types = @db.execute(<<SQL, item_name + '%')
+				stations = @db.execute(<<SQL, query_name + '%')
+SELECT
+	"stationID",
+	"stationName", "stationName_ZH",
+	"stations"."operationID",
+	"operationName", "operationName_ZH", "operationName_JA"
+FROM
+	"stations" JOIN "operations" ON "stations"."operationID" = "operations"."operationID"
+WHERE
+	"stationName" LIKE ?1 OR "stationName_ZH" LIKE ?1
+SQL
+				case stations.length
+				when 0
+					@responses[:no_query_station] % {query_name: query_name}
+				when 1
+					station_info(*stations.first)
+				else
+					station_names = stations.sample(@duplicate_display_door).map do |_, station_name, station_name_zh, _|
+						@format[:station_name] % {
+							station_name: station_name,
+							station_name_zh: station_name_zh
+						}
+					end
+					@responses[
+						if stations.length > @duplicate_display_door
+							:duplicate_station_more
+						else
+							:duplicate_station
+						end
+					] % {
+						station_names: station_names.join("\n")
+					}
+				end
+			end
+		end
+	end
+
+	#noinspection RubyResolve
+	def function_faction_info(_, _, command, _)
+		if /^势力\s*(?<query_name>.+)/ =~ command
+				faction_name, faction_name_zh, faction_name_ja,
+				description, description_zh, description_ja,
+				station_count, solar_system_count = @db.get_first_row(<<SQL, query_name + '%')
+SELECT
+	"factionName", "factionName_ZH", "factionName_JA",
+	"description", "description_ZH", "description_JA",
+	"stationCount", "solarSystemCount"
+FROM
+	"factions"
+WHERE
+	"factionName" LIKE ?1 OR "factionName_ZH" LIKE ?1 OR "factionName_JA" LIKE ?1
+SQL
+			if faction_name
+				@responses[:display_faction] % {
+					faction_name: @format[:faction_name] % {
+						faction_name: faction_name,
+						faction_name_zh: faction_name_zh,
+						faction_name_ja: faction_name_ja
+					},
+					description: (
+						if description
+							@format[:description] % {
+								description: description,
+								description_zh: description_zh,
+								description_ja: description_ja
+							}
+						else
+							@format[:description_none]
+						end
+					),
+					station_count: station_count,
+					solar_system_count: solar_system_count,
+				}
+			else
+				@responses[:no_query_faction] % {query_name: query_name}
+			end
+		end
+	end
+
+	#noinspection RubyResolve
+	def function_race_info(_, _, command, _)
+		if /^种族\s*(?<query_name>.+)/ =~ command
+			race_name, race_name_zh, race_name_ja,
+				description, description_zh, description_ja = @db.get_first_row(<<SQL, query_name + '%')
+SELECT
+	"raceName",    "raceName_ZH",    "raceName_JA",
+	"description", "description_ZH", "description_JA"
+FROM
+	"races"
+WHERE
+	"raceName" LIKE ?1 OR "raceName_ZH" LIKE ?1 OR "raceName_JA" LIKE ?1
+SQL
+			if race_name
+				@responses[:display_race] % {
+					race_name: @format[:race_name] % {
+						race_name: race_name,
+						race_name_zh: race_name_zh,
+						race_name_ja: race_name_ja
+					},
+					description: (
+						if description
+							@format[:description] % {
+								description: description,
+								description_zh: description_zh,
+								description_ja: description_ja
+							}
+						else
+							@format[:description_none]
+						end
+					),
+				}
+			else
+				@responses[:no_query_race] % {query_name: query_name}
+			end
+		end
+	end
+
+	#noinspection RubyResolve
+	def item_info(type_id, type_name, type_name_zh, type_name_ja, description, description_zh, description_ja, mass, volume)
+		attributes = @db.execute(<<SQL, type_id)
+SELECT
+	"attributes"."displayName_ZH", "value", "units"."displayName_ZH"
+FROM
+	"typeAttributes"
+	JOIN "attributes" ON "typeAttributes"."attributeID" = "attributes"."attributeID"
+	JOIN "units" ON "attributes"."unitID" = "units"."unitID"
+WHERE
+	"typeAttributes"."typeID" = ?1 AND "attributes"."displayName_ZH" IS NOT NULL
+SQL
+		@responses[:display_item] % {
+			type_name: @format[:type_name] % {
+				type_name: type_name,
+				type_name_zh: type_name_zh,
+				type_name_ja: type_name_ja
+			},
+			description: (
+			if description
+				@format[:description] % {
+					description: description,
+					description_zh: description_zh,
+					description_ja: description_ja
+				}
+			else
+				@format[:description_none]
+			end
+			),
+			mass: mass,
+			volume: volume,
+			attributes: attributes.map{ |attribute_name, value, unit_name|
+				@format[:attribute] % {
+					attribute_name: attribute_name,
+					value: value,
+					unit_name: unit_name,
+				}
+			}.join("\n"),
+		}
+	end
+
+	#noinspection RubyResolve,RubyScope
+	def function_item_info(_, _, command, _)
+		if /^物品\s*(?<query_name>.+)/ =~ command
+			type = @db.get_first_row(<<SQL, query_name)
 SELECT
 	"typeID",
-	"typeName",
-	"typeName_ZH",
-	"typeName_JA",
-	"description_ZH",
-	"mass",
-	"volume"
+	"typeName", "typeName_ZH", "typeName_JA",
+	"description", "description_ZH", "description_JA",
+	"mass", "volume"
 FROM
 	"types"
 WHERE
-	"typeName" LIKE ?1
-	OR "typeName_ZH" LIKE ?1
-	OR "typeName_JA" LIKE ?1
+	"typeName" = ?1 OR "typeName_ZH" = ?1 OR "typeName_JA" = ?1
+SQL
+			if type
+				item_info(*type)
+			else
+				types = @db.execute(<<SQL, query_name + '%')
+SELECT
+	"typeID",
+	"typeName", "typeName_ZH", "typeName_JA",
+	"description", "description_ZH", "description_JA",
+	"mass", "volume"
+FROM
+	"types"
+WHERE
+	"typeName" LIKE ?1 OR "typeName_ZH" LIKE ?1 OR "typeName_JA" LIKE ?1
 SQL
 				case types.length
 				when 0
-					@responses[:no_item] % {item_name: item_name}
+					@responses[:no_query_item] % {query_name: query_name}
 				when 1
-					item_info(*types[0])
+					item_info(*types.first)
 				else
-					type_names = types.map! do |_, type_name, type_name_zh, type_name_ja, _, _, _|
-						"#{type_name} ／ #{type_name_zh} ／ #{type_name_ja}"
+					type_names = types.sample(@duplicate_display_door).map! do |_, type_name, type_name_zh, type_name_ja, _|
+						@format[:type_name] % {
+							type_name: type_name,
+							type_name_zh: type_name_zh,
+							type_name_ja: type_name_ja
+						}
 					end
-					if type_names.length > @duplicate_display_door
-						@responses[:duplicate_item_more] % {type_names:  type_names.first(@duplicate_display_door).join("\n")}
-					else
-						@responses[:duplicate_item] % {type_names: type_names.join("\n")}
-					end
+					@responses[
+						if types.length > @duplicate_display_door
+							:duplicate_item_more
+						else
+							:duplicate_item
+						end
+					] % {
+						type_names: type_names.join("\n")
+					}
 				end
 			end
 		end
@@ -162,197 +426,63 @@ SQL
 		buy = json_data['buy']['max']
 		sell = json_data['sell']['min']
 		@responses[:display_price] % {
-			type_name: type_name,
-			type_name_zh: type_name_zh,
-			type_name_ja: type_name_ja,
+			type_name: @format[:type_name] % {
+				type_name: type_name,
+				type_name_zh: type_name_zh,
+				type_name_ja: type_name_ja
+			},
 			buy_price: buy ? format_price(buy) + @units[:price] : @responses[:no_price],
 			sell_price: sell ? format_price(sell) + @units[:price] : @responses[:no_price],
 		}
 	end
 
-	#noinspection RubyResolve
+	#noinspection RubyResolve,RubyScope
 	def function_market(_, _, command, _)
-		if COMMAND_MARKET =~ command
-			item_name = $~[:item_name]
-			types = @db.get_first_row(<<SQL, item_name)
+		if /^市场\s*(?<query_name>.+)/ =~ command
+			type = @db.get_first_row(<<SQL, query_name)
 SELECT
 	"typeID",
-	"typeName",
-	"typeName_ZH",
-	"typeName_JA"
+	"typeName", "typeName_ZH", "typeName_JA"
 FROM
 	"marketTypes"
 WHERE
-	"typeName" = ?1
-	OR "typeName_ZH" = ?1
-	OR "typeName_JA" = ?1
+	"typeName" = ?1 OR "typeName_ZH" = ?1 OR "typeName_JA" = ?1
 SQL
-			if types
-				format_market_result(*types)
+			if type
+				format_market_result(*type)
 			else
-				types = @db.execute(<<SQL, item_name + '%')
+				types = @db.execute(<<SQL, query_name + '%')
 SELECT
 	"typeID",
-	"typeName",
-	"typeName_ZH",
-	"typeName_JA"
+	"typeName", "typeName_ZH", "typeName_JA"
 FROM
 	"marketTypes"
 WHERE
-	"typeName" LIKE ?1
-	OR "typeName_ZH" LIKE ?1
-	OR "typeName_JA" LIKE ?1
+	"typeName" LIKE ?1 OR "typeName_ZH" LIKE ?1 OR "typeName_JA" LIKE ?1
 SQL
 				case types.length
 				when 0
-					@responses[:no_item] % {item_name: item_name}
+					@responses[:no_query_item] % {query_name: query_name}
 				when 1
-					format_market_result(*types[0])
+					format_market_result(*types.first)
 				else
-					type_names = types.map! do |_, type_name, type_name_zh, type_name_ja|
-						"#{type_name} ／ #{type_name_zh} ／ #{type_name_ja}"
+					type_names = types.sample(@duplicate_display_door).map! do |_, type_name, type_name_zh, type_name_ja, _|
+						@format[:type_name] % {
+							type_name: type_name,
+							type_name_zh: type_name_zh,
+							type_name_ja: type_name_ja
+						}
 					end
-					if type_names.length > @duplicate_display_door
-						@responses[:duplicate_item_more] % {type_names:  type_names.first(@duplicate_display_door).join("\n")}
-					else
-						@responses[:duplicate_item] % {type_names: type_names.join("\n")}
-					end
+					@responses[
+						if types.length > @duplicate_display_door
+							:duplicate_item_more
+						else
+							:duplicate_item
+						end
+					] % {
+						type_names: type_names.join("\n")
+					}
 				end
-			end
-		end
-	end
-
-	#noinspection RubyResolve
-	def function_station_info(_, _, command, _)
-		if COMMAND_STATION_INFO =~ command
-			system_name = $~[:system_name]
-			stations = @db.execute(<<SQL, system_name)
-SELECT
-	"stationName_ZH"
-FROM
-	"stations"
-WHERE
-	"solarSystemID" = (
-		SELECT
-			"solarSystemID"
-		FROM
-			"solarSystems"
-		WHERE
-			"solarSystemName" = ?1
-			OR "solarSystemName_ZH" = ?1
-			OR "solarSystemName_JP" = ?1
-	)
-SQL
-			if stations.empty?
-				@responses[:no_system] % {system_name: system_name}
-			else
-				@responses[:display_stations] % {
-					system_name: system_name,
-					station_names: stations.map! { |row| "#{row[0]}" }.join("\n"),
-				}
-			end
-		end
-	end
-
-	#noinspection RubyResolve
-	def function_solar_system_info(_, _, command, _)
-		if COMMAND_SYSTEM_INFO =~ command
-			system_name = $~[:system_name]
-			system = @db.get_first_row(<<SQL, system_name)
-SELECT
-	"solarSystems"."solarSystemName",
-	"solarSystems"."solarSystemName_ZH",
-	"factions"."factionName_ZH",
-	"solarSystems"."security"
-FROM
-	"solarSystems"
-	JOIN "factions"
-		ON "solarSystems"."factionID" = "factions"."factionID"
-WHERE
-	"solarSystems"."solarSystemName" = ?1
-	OR "solarSystems"."solarSystemName_ZH" = ?1
-SQL
-			if system
-				@responses[:display_system] % {
-					system_name: system[0],
-					system_name_zh: system[1],
-					faction_name: system[2],
-					security: system[3],
-				}
-			else
-				@responses[:no_system] % {system_name: system_name}
-			end
-		end
-	end
-
-	#noinspection RubyResolve
-	def function_faction_info(_, _, command, _)
-		if COMMAND_FACTION_INFO =~ command
-			faction_name = $~[:faction_name]
-			faction = @db.get_first_row(<<SQL, faction_name + '%')
-SELECT
-	"factionName",
-	"factionName_ZH",
-	"factionName_JA",
-	"stationCount",
-	"solarSystemCount",
-	"description",
-	"description_ZH",
-	"description_JA"
-FROM
-	"factions"
-WHERE
-	"factionName" LIKE ?1
-	OR "factionName_ZH" LIKE ?1
-	OR "factionName_JA" LIKE ?1
-SQL
-			if faction
-				@responses[:display_faction] % {
-					faction_name: faction[0],
-					faction_name_zh: faction[1],
-					faction_name_ja: faction[2],
-					station_count: faction[3],
-					solar_system_count: faction[4],
-					description: faction[5],
-					description_zh: faction[6],
-					description_ja: faction[7],
-				}
-			else
-				@responses[:no_faction] % {faction_name: faction_name}
-			end
-		end
-	end
-
-	#noinspection RubyResolve
-	def function_race_info(_, _, command, _)
-		if COMMAND_RACE_INFO =~ command
-			race_name = $~[:race_name]
-			race = @db.get_first_row(<<SQL, race_name + '%')
-SELECT
-	"raceName",
-	"raceName_ZH",
-	"raceName_JA",
-	"description",
-	"description_ZH",
-	"description_JA"
-FROM
-	"races"
-WHERE
-	"raceName" LIKE ?1
-	OR "raceName_ZH" LIKE ?1
-	OR "raceName_JA" LIKE ?1
-SQL
-			if race
-				@responses[:display_race] % {
-					race_name: race[0],
-					race_name_zh: race[1],
-					race_name_ja: race[2],
-					description: race[3],
-					description_zh: race[4],
-					description_ja: race[5],
-				}
-			else
-				@responses[:no_race] % {race_name: race_name}
 			end
 		end
 	end

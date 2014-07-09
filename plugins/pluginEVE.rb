@@ -50,6 +50,7 @@ MANUAL
 	#noinspection RubyResolve
 	def function_online(_, _, command, _)
 		if /^在线人数$/ =~ command
+			current_online = 0
 			TCPSocket.open('211.144.214.68', 26000) { |socket| current_online = socket.read(57)[20, 2].unpack('S') }
 			@responses[:display_current_online] % {current_online: current_online}
 		end

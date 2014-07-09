@@ -4,6 +4,7 @@ require 'json'
 require 'net/http'
 require 'uri'
 require 'rexml/document'
+require 'socket'
 
 =begin
 使用EVE国服市场中心的物价查询API
@@ -12,10 +13,11 @@ require 'rexml/document'
 class PluginEVE < PluginNicknameResponderCombineFunctionBase
 	NAME = 'EVE插件'
 	AUTHOR = 'BR'
-	VERSION = '2.4'
+	VERSION = '2.5'
 	DESCRIPTION = '我们的征途的星辰大海'
 	MANUAL = <<MANUAL.strip
 == 吉他价格查询 ==
+EVE 在线人数
 EVE 星系 <星系> # 查询星系信息
 EVE 空间站 <空间站> # 查询空间站信息
 EVE 势力 <势力> # 查询势力信息
@@ -46,28 +48,20 @@ MANUAL
 	end
 
 	#noinspection RubyResolve
-	def function_mineral(_, _, command, _)
-		if /^矿物$/ =~ command
-			response = ''
-			REXML::Document.new(Net::HTTP.get(URI('http://www.ceve-market.org/api/evemon'))).each_element('minerals/mineral') do |element|
-				response << <<RESPONSE
-#{element[0].text}：#{format_price(element[1].text)} #{@units[:price]}
-RESPONSE
-			end
-			response
+	def function_online(_, _, command, _)
+		if /^在线人数$/ =~ command
+			TCPSocket.open('211.144.214.68', 26000) { |socket| current_online = socket.read(57)[20, 2].unpack('S') }
+			@responses[:display_current_online] % {current_online: current_online}
 		end
 	end
 
 	#noinspection RubyResolve
 	def solar_system_info(solar_system_id, solar_system_name, solar_system_name_zh, faction_name, faction_name_zh, faction_name_ja, security)
-		station_names = @db.execute(<<SQL, solar_system_id)
-SELECT
-	"stationName", "stationName_ZH"
-FROM
-	"stations"
-WHERE
-	"solarSystemID" = ?1
-SQL
+		station_names = @db.execute(<<SQLITE, solar_system_id)
+SELECT "stationName", "stationName_ZH"
+FROM "stations"
+WHERE "solarSystemID" = ?1
+SQLITE
 		@responses[:display_solar_system] % {
 			solar_system_name:
 				@format[:solar_system_name] % {
@@ -104,31 +98,27 @@ SQL
 	#noinspection RubyResolve,RubyScope
 	def function_solar_system_info(_, _, command, _)
 		if /^星系\s*(?<query_name>.+)/ =~ command
-			solar_system = @db.get_first_row(<<SQL, query_name)
+			solar_system = @db.get_first_row(<<SQLITE, query_name)
 SELECT
 	"solarSystemID",
 	"solarSystemName", "solarSystemName_ZH",
 	"factionName", "factionName_ZH", "factionName_JA",
 	"security"
-FROM
-	"solarSystems" LEFT JOIN "factions" ON "solarSystems"."factionID" = "factions"."factionID"
-WHERE
-	"solarSystemName" = ?1 OR "solarSystemName_ZH" = ?1
-SQL
+FROM "solarSystems" LEFT JOIN "factions" ON "solarSystems"."factionID" = "factions"."factionID"
+WHERE "solarSystemName" = ?1 OR "solarSystemName_ZH" = ?1
+SQLITE
 			if solar_system
 				solar_system_info(*solar_system)
 			else
-				solar_systems = @db.execute(<<SQL, query_name + '%')
+				solar_systems = @db.execute(<<SQLITE, query_name + '%')
 SELECT
 	"solarSystemID",
 	"solarSystemName", "solarSystemName_ZH",
 	"factionName", "factionName_ZH", "factionName_JA",
 	"security"
-FROM
-	"solarSystems" LEFT JOIN "factions" ON "solarSystems"."factionID" = "factions"."factionID"
-WHERE
-	"solarSystemName" LIKE ?1 OR "solarSystemName_ZH" LIKE ?1
-SQL
+FROM "solarSystems" LEFT JOIN "factions" ON "solarSystems"."factionID" = "factions"."factionID"
+WHERE "solarSystemName" LIKE ?1 OR "solarSystemName_ZH" LIKE ?1
+SQLITE
 				case solar_systems.size
 				when 0
 					@responses[:no_query_solar_system] % {query_name: query_name}
@@ -158,14 +148,11 @@ SQL
 
 	#noinspection RubyResolve
 	def station_info(station_id, station_name, station_name_zh, operation_id, operation_name, operation_name_zh, operation_name_ja)
-		service_names = @db.execute(<<SQL, operation_id)
-SELECT
-	"serviceName", "serviceName_ZH", "serviceName_JA"
-FROM
-	"operationServices" JOIN "services" ON "operationServices"."serviceID" = "services"."serviceID"
-WHERE
-	"operationID" = ?1
-SQL
+		service_names = @db.execute(<<SQLITE, operation_id)
+SELECT "serviceName", "serviceName_ZH", "serviceName_JA"
+FROM "operationServices" JOIN "services" ON "operationServices"."serviceID" = "services"."serviceID"
+WHERE "operationID" = ?1
+SQLITE
 		@responses[:display_station] % {
 			station_name: @format[:station_name] % {
 				station_name: station_name,
@@ -189,31 +176,27 @@ SQL
 	#noinspection RubyResolve
 	def function_station_info(_, _, command, _)
 		if /^空间站\s*(?<query_name>.+)/ =~ command
-			station = @db.get_first_row(<<SQL, query_name)
+			station = @db.get_first_row(<<SQLITE, query_name)
 SELECT
 	"stationID",
 	"stationName", "stationName_ZH",
 	"stations"."operationID",
 	"operationName", "operationName_ZH", "operationName_JA"
-FROM
-	"stations" JOIN "operations" ON "stations"."operationID" = "operations"."operationID"
-WHERE
-	"stationName" = ?1 OR "stationName_ZH" = ?1
-SQL
+FROM "stations" JOIN "operations" ON "stations"."operationID" = "operations"."operationID"
+WHERE "stationName" = ?1 OR "stationName_ZH" = ?1
+SQLITE
 			if station
 				station_info(*station)
 			else
-				stations = @db.execute(<<SQL, query_name + '%')
+				stations = @db.execute(<<SQLITE, query_name + '%')
 SELECT
 	"stationID",
 	"stationName", "stationName_ZH",
 	"stations"."operationID",
 	"operationName", "operationName_ZH", "operationName_JA"
-FROM
-	"stations" JOIN "operations" ON "stations"."operationID" = "operations"."operationID"
-WHERE
-	"stationName" LIKE ?1 OR "stationName_ZH" LIKE ?1
-SQL
+FROM "stations" JOIN "operations" ON "stations"."operationID" = "operations"."operationID"
+WHERE "stationName" LIKE ?1 OR "stationName_ZH" LIKE ?1
+SQLITE
 				case stations.length
 				when 0
 					@responses[:no_query_station] % {query_name: query_name}
@@ -245,16 +228,14 @@ SQL
 		if /^势力\s*(?<query_name>.+)/ =~ command
 				faction_name, faction_name_zh, faction_name_ja,
 				description, description_zh, description_ja,
-				station_count, solar_system_count = @db.get_first_row(<<SQL, query_name + '%')
+				station_count, solar_system_count = @db.get_first_row(<<SQLITE, query_name + '%')
 SELECT
 	"factionName", "factionName_ZH", "factionName_JA",
 	"description", "description_ZH", "description_JA",
 	"stationCount", "solarSystemCount"
-FROM
-	"factions"
-WHERE
-	"factionName" LIKE ?1 OR "factionName_ZH" LIKE ?1 OR "factionName_JA" LIKE ?1
-SQL
+FROM "factions"
+WHERE "factionName" LIKE ?1 OR "factionName_ZH" LIKE ?1 OR "factionName_JA" LIKE ?1
+SQLITE
 			if faction_name
 				@responses[:display_faction] % {
 					faction_name: @format[:faction_name] % {
@@ -286,15 +267,13 @@ SQL
 	def function_race_info(_, _, command, _)
 		if /^种族\s*(?<query_name>.+)/ =~ command
 			race_name, race_name_zh, race_name_ja,
-				description, description_zh, description_ja = @db.get_first_row(<<SQL, query_name + '%')
+				description, description_zh, description_ja = @db.get_first_row(<<SQLITE, query_name + '%')
 SELECT
 	"raceName",    "raceName_ZH",    "raceName_JA",
 	"description", "description_ZH", "description_JA"
-FROM
-	"races"
-WHERE
-	"raceName" LIKE ?1 OR "raceName_ZH" LIKE ?1 OR "raceName_JA" LIKE ?1
-SQL
+FROM "races"
+WHERE "raceName" LIKE ?1 OR "raceName_ZH" LIKE ?1 OR "raceName_JA" LIKE ?1
+SQLITE
 			if race_name
 				@responses[:display_race] % {
 					race_name: @format[:race_name] % {
@@ -484,6 +463,19 @@ SQL
 					}
 				end
 			end
+		end
+	end
+
+	#noinspection RubyResolve
+	def function_mineral(_, _, command, _)
+		if /^矿物$/ =~ command
+			response = ''
+			REXML::Document.new(Net::HTTP.get(URI('http://www.ceve-market.org/api/evemon'))).each_element('minerals/mineral') do |element|
+				response << <<RESPONSE
+#{element[0].text}：#{format_price(element[1].text)} #{@units[:price]}
+RESPONSE
+			end
+			response
 		end
 	end
 end

@@ -33,6 +33,8 @@
   :attribute: |-
     %{attribute_name}：%{value} %{unit_name}
 :responses:
+  :display_current_online: |-
+    在线人数: %{current_online}
   :display_solar_system: |-
     %{solar_system_name}
     归属势力：%{faction_name}

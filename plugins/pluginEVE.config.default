@@ -34,7 +34,8 @@
     %{attribute_name}：%{value} %{unit_name}
 :responses:
   :display_current_online: |-
-    在线人数: %{current_online}
+    宁静（Tranquility）在线人数: %{tranquility_current_online}
+    晨曦（Serenity）   在线人数: %{serenity_current_online}
   :display_solar_system: |-
     %{solar_system_name}
     归属势力：%{faction_name}

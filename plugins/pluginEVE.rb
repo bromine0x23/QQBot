@@ -13,7 +13,7 @@ require 'socket'
 class PluginEVE < PluginNicknameResponderCombineFunctionBase
 	NAME = 'EVE插件'
 	AUTHOR = 'BR'
-	VERSION = '2.5'
+	VERSION = '2.6'
 	DESCRIPTION = '我们的征途的星辰大海'
 	MANUAL = <<MANUAL.strip
 == 吉他价格查询 ==
@@ -50,9 +50,13 @@ MANUAL
 	#noinspection RubyResolve
 	def function_online(_, _, command, _)
 		if /^在线人数$/ =~ command
-			current_online = 0
-			TCPSocket.open('211.144.214.68', 26000) { |socket| current_online = socket.read(57)[20, 2].unpack('S') }
-			@responses[:display_current_online] % {current_online: current_online}
+			tranquility_current_online, serenity_current_online = 0, 0
+			TCPSocket.open('87.237.38.200', 26000) { |socket| tranquility_current_online = socket.read(57)[20, 2].unpack('S') }
+			TCPSocket.open('211.144.214.68', 26000) { |socket| serenity_current_online = socket.read(57)[20, 2].unpack('S') }
+			@responses[:display_current_online] % {
+				tranquility_current_online: tranquility_current_online,
+				serenity_current_online: serenity_current_online
+			}
 		end
 	end
 

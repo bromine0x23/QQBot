@@ -1,0 +1,310 @@
+---
+? !ruby/symbol name
+: 沙盒插件
+? !ruby/symbol description
+: eval "reboot"
+? !ruby/symbol manual
+: |-
+  eval <language> <code>
+? !ruby/symbol priority
+: 0
+? !ruby/symbol enable
+: false
+? !ruby/symbol prefix
+: eval
+? !ruby/symbol display
+: ? !ruby/symbol compile_timeout
+  : |-
+    代码编译超时
+  ? !ruby/symbol compile_failed
+  : |-
+    编译失败
+    %{message}
+  ? !ruby/symbol no_output
+  : |-
+    执行成功
+  ? !ruby/symbol restricted_function
+  : |-
+    用了一些奇怪的函数呢
+  ? !ruby/symbol memory_limit_exceed
+  : |-
+    警告！内存不足
+  ? !ruby/symbol output_limit_exceed
+  : |-
+    输出太多了要溢出来了
+  ? !ruby/symbol time_limit_exceed
+  : |-
+    代码太慢了，不等了
+  ? !ruby/symbol runtime_error
+  : |-
+    发生了运行时错误
+  ? !ruby/symbol fatal
+  : |-
+    不知道发生了什么，总之crash了(%{status})
+? !ruby/symbol base_name
+: eval
+? !ruby/symbol languages
+: - &language_c
+    ? !ruby/symbol name
+    : !ruby/regexp /\A(?:c)\Z/i
+    ? !ruby/symbol suffix
+    : ? !ruby/symbol source
+      : '.c'
+      ? !ruby/symbol program
+      : ''
+    ? !ruby/symbol compile
+    : ? !ruby/symbol timeout
+      : 5
+      ? !ruby/symbol command
+      : gcc -g0 -O3 -Wfatal-errors -D NDEBUG -U DEBUG -o %{program_file} %{source_file}
+    ? !ruby/symbol run
+    : ? !ruby/symbol command
+      : ./c_sandbox.sandbox ./%{program_file}
+    ? !ruby/symbol clean
+    : ? !ruby/symbol command
+      : rm -f %{source_file} %{program_file}
+    ? !ruby/symbol template
+    : |
+      #include <ctype.h>
+      #include <errno.h>
+      #include <fenv.h>
+      #include <float.h>
+      #include <inttypes.h>
+      #include <iso646.h>
+      #include <limits.h>
+      #include <math.h>
+      #include <stddef.h>
+      #include <stdint.h>
+      #include <stdlib.h>
+      #include <string.h>
+      #include <time.h>
+      #include <wchar.h>
+      #include <wctype.h>
+      int main(){
+      %{code}
+        return 0;
+      }
+  - <<: *language_c
+    ? !ruby/symbol name
+    : !ruby/regexp /\A(?:c90)\Z/i
+    ? !ruby/symbol compile
+    : ? !ruby/symbol command
+      : gcc -g0 -O3 -Wfatal-errors -std=c90 -D NDEBUG -U DEBUG -o %{program_file} %{source_file}
+  - <<: *language_c
+    ? !ruby/symbol name
+    : !ruby/regexp /\A(?:c99)\Z/i
+    ? !ruby/symbol compile
+    : ? !ruby/symbol command
+      : gcc -g0 -O3 -Wfatal-errors -std=c99 -D NDEBUG -U DEBUG -o %{program_file} %{source_file}
+  - <<: *language_c
+    ? !ruby/symbol name
+    : !ruby/regexp /\A(?:c1x)\Z/i
+    ? !ruby/symbol compile
+    : ? !ruby/symbol command
+      : gcc -g0 -O3 -Wfatal-errors -std=c1x -D NDEBUG -U DEBUG -o %{program_file} %{source_file}
+  - &language_cpp
+    ? !ruby/symbol name
+    : !ruby/regexp /\A(?:c\+\+|cpp)\Z/i
+    ? !ruby/symbol suffix
+    : ? !ruby/symbol source
+      : '.cpp'
+      ? !ruby/symbol program
+      : ''
+    ? !ruby/symbol compile
+    : ? !ruby/symbol timeout
+      : 5
+      ? !ruby/symbol command
+      : g++ -g0 -O3 -Wfatal-errors -D NDEBUG -U DEBUG -o %{program_file} %{source_file}
+    ? !ruby/symbol run
+    : ? !ruby/symbol command
+      : ./cpp_sandbox.sandbox ./%{program_file}
+    ? !ruby/symbol clean
+    : ? !ruby/symbol command
+      : rm -f %{source_file} %{program_file}
+    ? !ruby/symbol template
+    : |
+      #include <cctype>
+      #include <cerrno>
+      #include <cfloat>
+      #include <ciso646>
+      #include <climits>
+      #include <cmath>
+      #include <cstddef>
+      #include <cstdlib>
+      #include <cstring>
+      #include <ctime>
+      #include <cwchar>
+      #include <cwctype>
+      #include <algorithm>
+      #include <bitset>
+      #include <complex>
+      #include <deque>
+      #include <exception>
+      #include <functional>
+      #include <iomanip>
+      #include <iostream>
+      #include <iterator>
+      #include <limits>
+      #include <list>
+      #include <map>
+      #include <memory>
+      #include <new>
+      #include <numeric>
+      #include <queue>
+      #include <set>
+      #include <sstream>
+      #include <stack>
+      #include <stdexcept>
+      #include <string>
+      #include <typeinfo>
+      #include <utility>
+      #include <valarray>
+      #include <vector>
+      void function() {
+      %{code}
+      }
+      int main(){
+          function();
+          return 0;
+      }
+  - <<: *language_cpp
+    ? !ruby/symbol name
+    : !ruby/regexp /\A(?:(?:c\+\+|cpp)98)\Z/i
+    ? !ruby/symbol compile
+    : ? !ruby/symbol command
+      : g++ -g0 -O3 -Wfatal-errors -std=c++98 -D NDEBUG -U DEBUG -o %{program_file} %{source_file}
+  - <<: *language_cpp
+    ? !ruby/symbol name
+    : !ruby/regexp /\A(?:(?:c\+\+|cpp)03)\Z/i
+    ? !ruby/symbol compile
+    : ? !ruby/symbol command
+      : g++ -g0 -O3 -Wfatal-errors -std=c++03 -D NDEBUG -U DEBUG -o %{program_file} %{source_file}
+  - &language_cpp11
+    <<: *language_cpp
+    ? !ruby/symbol name
+    : !ruby/regexp /\A(?:(?:c\+\+|cpp)11)\Z/i
+    ? !ruby/symbol compile
+    : ? !ruby/symbol command
+      : g++ -g0 -O3 -Wfatal-errors -std=c++11 -D NDEBUG -U DEBUG -o %{program_file} %{source_file}
+    ? !ruby/symbol template
+    : |
+      #include <cctype>
+      #include <cerrno>
+      #include <cfenv>
+      #include <cfloat>
+      #include <cinttypes>
+      #include <ciso646>
+      #include <climits>
+      #include <cmath>
+      #include <cstddef>
+      #include <cstdint>
+      #include <cstdlib>
+      #include <cstring>
+      #include <ctime>
+      #include <cwchar>
+      #include <cwctype>
+      #include <algorithm>
+      #include <array>
+      #include <bitset>
+      #include <chrono>
+      #include <complex>
+      #include <deque>
+      #include <exception>
+      #include <forward_list>
+      #include <functional>
+      #include <initializer_list>
+      #include <iomanip>
+      #include <iostream>
+      #include <iterator>
+      #include <limits>
+      #include <list>
+      #include <map>
+      #include <memory>
+      #include <new>
+      #include <numeric>
+      #include <queue>
+      #include <random>
+      #include <ratio>
+      #include <regex>
+      #include <set>
+      #include <sstream>
+      #include <stack>
+      #include <stdexcept>
+      #include <string>
+      #include <tuple>
+      #include <type_traits>
+      #include <typeindex>
+      #include <typeinfo>
+      #include <unordered_map>
+      #include <unordered_set>
+      #include <utility>
+      #include <valarray>
+      #include <vector>
+      template< typename Function, bool return_void = std::is_void< decltype(std::declval< Function >()()) >::value >
+      struct FunctionCaller {
+        static void call(Function const & function) { function(); }
+      };
+      template< typename Function >
+      struct FunctionCaller< Function, false > {
+        static void call(Function const & function) { std::cout << function() << std::endl; }
+      };
+      int main(){
+        auto function = []() {
+      %{code}
+        };
+        FunctionCaller< decltype(function) >::call(function);
+        return 0;
+      }
+  - <<: *language_cpp11
+    ? !ruby/symbol name
+    : !ruby/regexp /\A(?:(?:c\+\+|cpp)14)\Z/i
+    ? !ruby/symbol compile
+    : ? !ruby/symbol command
+      : g++ -g0 -O3 -Wfatal-errors -std=c++14 -D NDEBUG -U DEBUG -o %{program_file} %{source_file}
+  -
+    ? !ruby/symbol name
+    : !ruby/regexp /\A(?:ruby|rb)\Z/i
+    ? !ruby/symbol suffix
+    : ? !ruby/symbol source
+      : '.rb'
+      ? !ruby/symbol program
+      : '.rb'
+    ? !ruby/symbol compile
+    : ? !ruby/symbol timeout
+      : 2
+      ? !ruby/symbol command
+      : ruby1.9.3 -c ./%{source_file}
+    ? !ruby/symbol run
+    : ? !ruby/symbol command
+      : ./ruby_sandbox.sandbox ./%{program_file}
+    ? !ruby/symbol clean
+    : ? !ruby/symbol command
+      : rm -f %{program_file}
+    ? !ruby/symbol template
+    : |
+      #!/usr/bin/ruby1.9.3
+      # -*- coding: utf-8 -*-
+      $SAFE = 3
+      %{code}
+  -
+    ? !ruby/symbol name
+    : !ruby/regexp /\A(?:haskell|hs)\Z/i
+    ? !ruby/symbol suffix
+    : ? !ruby/symbol source
+      : '.hs'
+      ? !ruby/symbol program
+      : ''
+    ? !ruby/symbol compile
+    : ? !ruby/symbol timeout
+      : 2
+      ? !ruby/symbol command
+      : ghc -Werror --make -Odph ./%{source_file}
+    ? !ruby/symbol run
+    : ? !ruby/symbol command
+      : ./haskell_sandbox.sandbox ./%{program_file}
+    ? !ruby/symbol clean
+    : ? !ruby/symbol command
+      : rm -f %{source_file} %{program_file} %{base_name}.o %{base_name}.hi
+    ? !ruby/symbol template
+    : |
+      %{code}

@@ -1,0 +1,11 @@
+---
+? !ruby/symbol name
+: 日志插件
+? !ruby/symbol description
+: 小本本上记一笔
+? !ruby/symbol manual
+: ''
+? !ruby/symbol priority
+: 255
+? !ruby/symbol enable
+: false

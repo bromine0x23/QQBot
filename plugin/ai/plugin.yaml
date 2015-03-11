@@ -1,0 +1,35 @@
+---
+? !ruby/symbol name
+: AI插件
+? !ruby/symbol description
+: 人家才不是AI呢
+? !ruby/symbol manual
+: |-
+  忘记 <消息>
+? !ruby/symbol priority
+: -255
+? !ruby/symbol enable
+: true
+? !ruby/symbol response_limit
+: 2048
+? !ruby/symbol responses
+: ? !ruby/symbol learned
+  : - 诶……是这样嘛?
+    - 了解了
+    - 哦，原来如此
+    - 恩
+    - 了解
+  ? !ruby/symbol too_long
+  : - 那太长了……
+    - 这么长人家完全记不住嘛
+    - 好长……
+  ? !ruby/symbol forgot
+  : - Accept
+    - 记忆已清除
+  ? !ruby/symbol null
+  : - 喵帕斯
+    - 咪啪～☆
+    - 啊呜啊呜
+    - 姆Q
+    - 嘟嘟噜♪
+    - 喵哈哈

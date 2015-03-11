@@ -1,0 +1,27 @@
+---
+? !ruby/symbol name
+: 加密插件
+? !ruby/symbol description
+: 佛曰：“色不异空，空不异色”
+? !ruby/symbol manual
+: |-
+  [问佛|参悟] <内容>
+  [编码|解码] Base64 <内容>
+  计算 [MD5|SHA1|SHA256|SHA384|SHA512] <内容>
+? !ruby/symbol priority
+: 200
+? !ruby/symbol enable
+: true
+? !ruby/symbol display
+: ? !ruby/symbol encode
+  : |-
+    %{type} 编码结果：
+    %{result}
+  ? !ruby/symbol decode
+  : |-
+    %{type} 解码结果：
+    %{result}
+  ? !ruby/symbol digest
+  : |-
+    %{type} 计算结果：
+    %{result}

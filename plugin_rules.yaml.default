@@ -1,6 +1,0 @@
----
-12345:
-  :forbidden_list: !ruby/object:Set
-    hash: {}
-  :group_managers: !ruby/object:Set
-    hash: {}

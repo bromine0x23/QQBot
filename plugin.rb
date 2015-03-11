@@ -1,230 +1,196 @@
 # -*- coding: utf-8 -*-
 
-require 'yaml'
+require 'English'
+require 'yajl'
 
-require_relative 'webqq/webqq'
+class Plugin
+	attr_reader :directory
 
-#noinspection RubyClassVariableUsageInspection,RubyTooManyMethodsInspection
-class PluginBase
-	NAME = '插件基类'
-	AUTHOR = 'BR'
-	VERSION = '0.0'
-	DESCRIPTION = '用于派生其他插件'
-	MANUAL = <<MANUAL
-MANUAL
-	PRIORITY = 0
-
-	PLUGIN_DIRECTORY = 'plugins'
-
-	@@plugins = []
-	@@instance_plugins = []
-
-	def self.instance_plugins
-		@@instance_plugins
+	def initialize(path)
+		@directory = File.dirname(path)
 	end
 
-	def self.plugins
-		@@plugins
+	def file_path(file_name)
+		File.join(directory, file_name)
 	end
 
-	# @param [WebQQProtocol::Client] client
-	# @param [Logger] logger
-	def initialize(qqbot, client, logger)
-		@qqbot = qqbot
-		@client = client
-		@logger = logger
+	# @param [QQBot] qqbot
+	def install(qqbot)
+		on_install(qqbot)
+		self
 	end
 
-	# @return [String]
-	def name
-		self.class::NAME
-	end
-
-	# @return [String]
-	def author
-		self.class::AUTHOR
-	end
-
-	# @return [String]
-	def version
-		self.class::VERSION
-	end
-
-	# @return [String]
-	def description
-		self.class::DESCRIPTION
-	end
-
-	# @return [String]
-	def manual
-		self.class::MANUAL
-	end
-
-	# @return [Integer]
-	def priority
-		self.class::PRIORITY
-	end
-
-	# @return [Hash]
-	def info
-		{
-			name: name,
-			author: author,
-			version: version,
-			description: description,
-			manual: manual,
-			priority: priority
-		}
-	end
-
-	def on_load
-		file_name = self.class.name
-		file_name[0] = file_name[0].downcase
-
-		config_file = "#{PLUGIN_DIRECTORY}/#{file_name}.config"
-		YAML.load_file(config_file).each_pair { |key, value| instance_variable_set(:"@#{key}", value) } if File.exist? config_file
-
-		data_file = "#{PLUGIN_DIRECTORY}/#{file_name}.data"
-		@data = YAML.load_file(data_file) if File.exist? data_file
-
-		log('载入完毕')
-	end
-
-	def on_unload
-		log('卸载完毕')
-		# 桩方法
-	end
-
-	def to_s
-		"#{name}[#{author}<#{version}>]：#{description}"
+	def uninstall
+		on_uninstall
+		self
 	end
 
 	protected
 
-	attr_reader :qqbot, :client
-
-	def log(message, level = Logger::INFO)
-		@logger.log(level, message, self.class.name)
-	end
-
-	def self.file_path(file_name)
-		File.expand_path "#{PLUGIN_DIRECTORY}/#{file_name}"
-	end
+	attr_reader :qqbot
 
 	private
 
-	STR_BASE = 'Base'
+	module Config
+		def name
+			config[:name] || '无名插件'
+		end
 
-	# @param [Class] subclass
-	def self.inherited(subclass)
-		@@plugins.unshift subclass
-		@@instance_plugins << subclass unless subclass.name.end_with? STR_BASE
-	end
-end
+		def description
+			config[:description] || 'QQBot插件'
+		end
 
-#noinspection RubyUnusedLocalVariable
-class PluginResponderBase < PluginBase
-	NAME = '消息回应插件基类'
+		def manual
+			config[:manual] || ''
+		end
 
-	# @param [WebQQProtocol::Friend] sender
-	# @param [String] message
-	# @param [Time] time
-	def on_message(sender, message, time)
-		response = deal_message(sender, message, time)
-		@client.send_message(sender, response) if response
-	end
+		def priority
+			config[:priority] || 0
+		end
 
-	# @param [WebQQProtocol::Group] from
-	# @param [WebQQProtocol::GroupMember] sender
-	# @param [String] message
-	# @param [Time] time
-	def on_group_message(from, sender, message, time)
-		response = deal_group_message(from, sender, message, time)
-		@client.send_message(from, response) if response
-	end
+		def to_s
+			'%<name>s：%<description>s' % {name: name, description: description}
+		end
 
-	# @param [WebQQProtocol::Friend] sender
-	# @param [String] message
-	# @param [Time] time
-	def deal_message(sender, message, time)
-		# 桩方法，好友消息响应
-	end
+		def inspect
+			"Plugin<#{name}>"
+		end
 
-	# @param [WebQQProtocol::Group] from
-	# @param [WebQQProtocol::GroupMember] sender
-	# @param [String] message
-	# @param [Time] time
-	def deal_group_message(from, sender, message, time)
-		# 桩方法，处理群消息响应
-	end
-end
+		private
 
-class PluginNicknameResponderBase < PluginResponderBase
-	NAME = '昵称呼叫型消息回应插件基类'
-
-	def initialize(qqbot, client, logger)
-		super
-		@nick = @qqbot.nick
-	end
-
-	# @param [WebQQProtocol::Friend] sender
-	# @param [String] message
-	# @param [Time] time
-	def deal_message(sender, message, time)
-		get_response(sender, sender, message, time)
-	end
-
-	# @param [WebQQProtocol::Group] from
-	# @param [WebQQProtocol::GroupMember] sender
-	# @param [String] message
-	# @param [Time] time
-	def deal_group_message(from, sender, message, time)
-		if /^@?#{nick}\s*(?<message>.*)/ =~ message
-			get_response(from, sender, $~[:message], time)
+		def config
+			@config ||= File.exist?(file_path('plugin.yaml')) ? YAML.load_file(file_path('plugin.yaml')) : {}
 		end
 	end
 
-	# @param [WebQQProtocol::Entity] from
-	# @param [WebQQProtocol::Entity] sender
-	# @param [String] command
-	# @param [Time] time
-	def get_response(from, sender, command, time)
-		# 桩方法，处理消息响应
-	end
+	module Filter
+		def enable(group)
+			filter[group.number] = true
+			save_filter
+		end
 
-	protected
-	attr_reader :nick
-end
+		def disable(group)
+			filter[group.number] = false
+			save_filter
+		end
 
-#noinspection ALL
-class PluginNicknameResponderCombineFunctionBase < PluginNicknameResponderBase
-
-	COMMAND_HEADER = ''
-
-	# @return [String]
-	def command_header
-		self.class::COMMAND_HEADER
-	end
-
-	# @return [Regexp]
-	def command_pattern
-		@command_pattern ||= /^#{command_header}\s*(?<command>.+)/i
-	end
-
-	# @return [Array[Symbol]]
-	def functions
-		@fuctions ||= methods.select! { |method_name| /^function_/ =~ method_name }
-	end
-
-	def get_response(from, sender, command, time)
-		if command_pattern =~ command
-			command = $~[:command]
-			response = nil
-			functions.each do |function|
-				response = send(function, from, sender, command, time)
-				break if response
+		def enable?(from)
+			if from.group?
+				filter.fetch(from.number){config[:enable]}
+			else
+				config[:enable]
 			end
-			response
+		end
+
+		private
+
+		def filter
+			@filter ||= File.exist?(file_path('plugin.filter')) ? YAML.load_file(file_path('plugin.filter')) : {}
+		end
+
+		def save_filter
+			File.write(file_path('plugin.filter'), YAML.dump(filter))
 		end
 	end
+
+	module EventHandle
+		def on_install(qqbot)
+			@qqbot = qqbot
+			install_hooks.each(&:call)
+		end
+
+		def on_uninstall
+			uninstall_hooks.each(&:call)
+		end
+
+		# @param [WebQQClient::Friend] sender
+		# @param [String] message
+		# @param [Time] time
+		def on_message(sender, message, time)
+			response = deal_message(sender, message, time)
+			send_message(sender, response) if response
+		end
+
+		# @param [WebQQClient::Group] from
+		# @param [WebQQClient::Friend] sender
+		# @param [String] message
+		# @param [Time] time
+		def on_group_message(from, sender, message, time)
+			response = deal_group_message(from, sender, message, time)
+			send_message(from, response) if response
+		end
+
+		# @param [WebQQClient::Discuss] from
+		# @param [WebQQClient::Friend] sender
+		# @param [String] message
+		# @param [Time] time
+		def on_discuss_message(from, sender, message, time)
+			response = deal_discuss_message(from, sender, message, time)
+			send_message(from, response) if response
+		end
+
+		private
+
+		def send_message(to, message)
+			qqbot.send_message(to, message)
+		end
+
+		def install_hooks
+			@install_hooks ||= []
+		end
+
+		def uninstall_hooks
+			@uninstall_hooks ||= []
+		end
+
+		def functions
+			@functions ||= []
+		end
+
+		def pattern_without_name
+			@pattern_without_name ||= /\A#{config[:prefix]}\s*(?<command>.*)\Z/mi
+		end
+
+		def pattern_with_name
+			@pattern_with_name ||= /\A@?#{qqbot.name}\s*#{config[:prefix]}\s*(?<command>.*)\Z/mi
+		end
+
+		def deal_message(sender, message, time)
+			get_response(sender, sender, $LAST_MATCH_INFO[:command].strip, time) if pattern_without_name =~ message
+		end
+
+		def deal_group_message(from, sender, message, time)
+			get_response(from, sender, $LAST_MATCH_INFO[:command].strip, time) if pattern_with_name =~ message
+		end
+
+		def deal_discuss_message(from, sender, message, time)
+			get_response(from, sender, $LAST_MATCH_INFO[:command].strip, time) if pattern_with_name =~ message
+		end
+
+		def get_response(from, sender, command, time)
+			functions.each do |function|
+				response = function.call(from, sender, command, time)
+				return response if response
+			end
+			nil
+		end
+	end
+
+	module Utility
+		def pseudo_random(seed, index = 11, mod = 11117)
+			index.times.reduce(seed) { |x, _i| x * x % mod }
+		end
+
+		def date_seed(date, year_rank = 10000, month_rank = 100, day_rank = 1)
+			date.year * year_rank + date.month * month_rank + date.day * day_rank
+		end
+
+		private
+
+		def local
+			@local ||= {}
+		end
+	end
+
+	include Config, Filter, EventHandle, Utility
 end

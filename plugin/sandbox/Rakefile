@@ -1,0 +1,22 @@
+# -*- coding: utf-8 -*-
+
+require 'rake/clean'
+
+CPP = 'g++'
+CPPFLAGS = %w(-Wall -g0 -O3 -std=c++14 -D NDEBUG -U DEBUG)
+LIBS = %w(-lsandbox)
+
+source_files = Rake::FileList['*_sandbox.cpp']
+target_files = source_files.ext('.sandbox')
+
+rule '.sandbox' => '.cpp' do |task|
+	sh CPP, *CPPFLAGS, '-o', task.name, task.source, *LIBS
+end
+
+task :all => target_files
+
+task :default => :all
+
+CLEAN.include(target_files)
+
+

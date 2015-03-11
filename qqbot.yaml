@@ -1,0 +1,27 @@
+---
+? !ruby/symbol account
+: 10086 # 帐号
+? !ruby/symbol password
+: 123456 # 密码
+? !ruby/symbol is_md5
+: false # password是否是经MD5运算后的结果
+? !ruby/symbol administrators
+: - 1 # 管理员列表
+  - 2 
+? !ruby/symbol managers
+: # 群管理员
+  4:
+  - 8
+  16:
+  - 32
+? !ruby/symbol font # 字体设置
+: ? !ruby/symbol name
+  : 微软雅黑
+  ? !ruby/symbol size
+  : 10
+  ? !ruby/symbol style
+  : - 0
+    - 0
+    - 0
+  ? !ruby/symbol color
+  : '000000'

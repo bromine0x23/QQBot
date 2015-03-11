@@ -1,0 +1,30 @@
+---
+? !ruby/symbol name
+: 问好插件
+? !ruby/symbol description
+: 主人，你是要先吃饭呢，还是要先洗澡呢，还是要……
+? !ruby/symbol manual
+: ''
+? !ruby/symbol priority
+: -10
+? !ruby/symbol enable
+: true
+? !ruby/symbol responses
+: ? !ruby/symbol morning
+  : - 早上好 %{name} (*´ω｀)o
+    - "%{name} 早上好"
+    - "%{name} 哦嗨哟"
+    - 早安 %{name}
+    - 新的一天开始了，%{name} 有什么打算呢？
+    - 早上好 %{name}，出门前记得看看黄历哦。
+    - 早安 %{name} ，准备好弄个大新闻了吗？
+    - 加油 %{name} 君！新的一天开始了，要好好努力呢！
+  ? !ruby/symbol evening
+  : - 晚安~ %{name} ＼(￣O￣)
+    - "%{name} 做个好梦(o´ω`o)"
+    - "%{name} 早点睡喵w"
+    - "%{name} 晚安"
+    - "%{name} 快去睡觉"
+    - 时候不早了，%{name} 快去睡觉
+    - "%{name} 君，睡太晚容易早衰哦~"
+

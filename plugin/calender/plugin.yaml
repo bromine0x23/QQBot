@@ -1,0 +1,223 @@
+---
+:name: 黄历插件
+:description: 今日不宜：玩弄AI
+:manual: |-
+  (我的)运势
+  (今日)黄历
+:priority: 5
+:enable: true
+:display:
+  :公历日期: |-
+    %{year}年%{month}月%{day}日 周%{周}
+  :农历日期: |-
+    %{天干}%{地支}%{生肖}年%{月}%{日}
+  :fortune: |-
+    %{公历日期}
+    %{农历日期}
+    %{name} 的运势指数: %{judge}(%{level})
+  :item: |-
+    %{name}：%{description}
+  :items: |-
+    %{公历日期}
+    %{农历日期}
+    宜：
+    %{good_items}
+    忌：
+    %{bad_items}
+:calender:
+  :ac:
+    :items:
+    - :name: 看AV
+      :good: 释放压力，重铸自我
+      :bad: 会被家人撞到
+    - :name: 组模型
+      :good: 今天的喷漆会很完美
+      :bad: 精神不集中板件被剪断了
+    - :name: 投稿情感区
+      :good: 问题圆满解决
+      :bad: 会被当事人发现
+    - :name: 逛匿名版
+      :good: 今天也要兵库北
+      :bad: 看到丧尸在晒妹
+    - :name: 和女神聊天
+      :good: 女神好感度上升
+      :bad: 我去洗澡了，呵呵
+    - :name: 啪啪啪
+      :good: 啪啪啪啪啪啪啪
+      :bad: 会卡在里面
+    - :name: 熬夜
+      :good: 夜间的效率更高
+      :bad: 明天有很重要的事
+    - :name: 锻炼
+      :good: 八分钟给你比利般的身材
+      :bad: 会拉伤肌肉
+    - :name: 散步
+      :good: 遇到妹子主动搭讪
+      :bad: 走路会踩到水坑
+    - :name: 打排位赛
+      :good: 遇到大腿上分500
+      :bad: 我方三人挂机
+    - :name: 汇报工作
+      :good: 被夸奖工作认真
+      :bad: 上班偷玩游戏被扣工资
+    - :name: 抚摸猫咪
+      :good: 才不是特意蹭你的呢
+      :bad: 死开！愚蠢的人类
+    - :name: 遛狗
+      :good: 遇见女神遛狗搭讪
+      :bad: 狗狗随地大小便被罚款
+    - :name: 烹饪
+      :good: 黑暗料理界就由我来打败
+      :bad: 难道这就是……仰望星空派？
+    - :name: 告白
+      :good: 其实我也喜欢你好久了
+      :bad: 对不起，你是一个好人
+    - :name: 求站内信
+      :good: 最新种子入手
+      :bad: 收到有码葫芦娃
+    - :name: 追新番
+      :good: 完结之前我绝不会死
+      :bad: 会被剧透
+    - :name: 打卡日常
+      :good: 怒回首页
+      :bad: 会被老板发现
+    - :name: 下副本
+      :good: 配合默契一次通过
+      :bad: 会被灭到散团
+    - :name: 抢沙发
+      :good: 沙发入手弹无虚发
+      :bad: 会被挂起来羞耻play
+    - :name: 网购
+      :good: 商品大减价
+      :bad: 问题产品需要退换
+    - :name: 跳槽
+      :good: 新工作待遇大幅提升
+      :bad: 再忍一忍就加薪了
+    - :name: 读书
+      :good: 知识就是力量
+      :bad: 注意力完全无法集中
+    - :name: 早睡
+      :good: 早睡早起方能养生
+      :bad: 会在半夜醒来，然后失眠
+    - :name: 逛街
+      :good: 物美价廉大优惠
+      :bad: 会遇到奸商
+  :eve:
+    :items:
+    - :name: 高安任务
+      :good: 全出腹背受敌
+      :bad: 拉暴动被反跳掉线
+    - :name: 刷异常
+      :good: 传说一跳破5k
+      :bad: 刚拉暴动就断网
+    - :name: 蹲站
+      :good: 今天WoW更新版本
+      :bad: 错过羊神发福利
+    - :name: 挖矿
+      :good: 矿涨价比房价还快
+      :bad: 红星蹲驻地星门了
+    - :name: 打入侵
+      :good: 统合部LP又涨价了
+      :bad: 后勤又断传电了
+    - :name: 打洞
+      :good: 闭着眼睛数钱
+      :bad: 洞主了！
+    - :name: 翻合同
+      :good: 有人填错数字，赚到了
+      :bad: 手一抖买了个金鹏子系统书
+    - :name: 参观战场
+      :good: 人品爆发捡了个杆子
+      :bad: 蛋都保不住了同学
+    - :name: 多开
+      :good: 横扫5级不解释
+      :bad: 不小心打到自己被筒子部端了
+    - :name: T1船制造
+      :good: 王师出货中
+      :bad: 反正肥的快都垄断了
+    - :name: 会战
+      :good: 怒抓一条泰坦
+      :bad: 互蹲星门到半夜下线
+    - :name: 堵门
+      :good: 有人运一船PLEX自动导航
+      :bad: 蹲一晚上秒睡了然后损了
+    - :name: 吃肉
+      :good: 又有金鹏秒睡了
+      :bad: 那个噩梦是永动装肉
+    - :name: 考古
+      :good: 势力POS图纸！
+      :bad: 没捡到势力POS图纸！人生还有什么意义！
+    - :name: KFC
+      :good: 全家桶网上订餐有优惠
+      :bad: 总监要查账
+    - :name: 低安任务
+      :good: 本地就一人简直开心
+      :bad: 遇一隐轰，船蛋双飞
+    - :name: 跑货
+      :good: 这个时间没人抓你
+      :bad: 出门就被堵死了
+    - :name: 刷死亡
+      :good: 小B大C潜龙图
+      :bad: 不好意思，双子妥妥的
+    - :name: T2制造
+      :good: 知道啥叫出货战争吗
+      :bad: 还嫌TC送得不够多？
+    - :name: 拆迁
+      :good: 壮哉我多炮塔神教
+      :bad: 别人早就跳旗舰回来守家了
+    - :name: 守官员
+      :good: AMM全抗妥妥的
+      :bad: 双子，你懂的
+    - :name: 偷运
+      :good: 学好吉他秒跳红减堵门也不怕
+      :bad: 居然有秒锁重拦不科学啊
+    - :name: 收割
+      :good: 异常秒睡党数不胜数
+      :bad: N跳外就被发现了
+    - :name: 打捞
+      :good: 就是要捞出一艘泰坦的男人啊
+      :bad: 突然刷个怪没看见，损
+    - :name: 塔玛观光
+      :good: 海盗都没起床
+      :bad: 这还用问？
+    - :name: 高安宣战
+      :good: 又有新鲜的肉啦
+      :bad: 被疯狂的新人围剿
+    - :name: 带路
+      :good: 王师，这边走！
+      :bad: 被王师爆了
+    - :name: 行星开发
+      :good: 一片茫茫白色区
+      :bad: 辛苦半天不如别人一顿KFC
+    - :name: 发明
+      :good: 10条线红了9条，还都是N流程的
+      :bad: 熊老师上线了
+    - :name: '1024'
+      :good: 你懂的
+      :bad: 强撸船飞蛋灭
+    - :name: 挖气云
+      :good: 低调的暴利行业
+      :bad: 没人买药
+    - :name: 泡YY
+      :good: 哟，萌妹子
+      :bad: 给新人讲解了半天对方表示刚睡着了
+    - :name: DOTA
+      :good: 妹子放一边，基友围一圈
+      :bad: 注定孤独一生
+    - :name: 坦克世界
+      :good: 我们击穿了对方装甲
+      :bad: 误国
+    - :name: 刷微博
+      :good: 新闻八卦不容错过
+      :bad: 你获得了50点负能量
+    - :name: EFT
+      :good: EFT是EVE的一部分为什么就是不明白
+      :bad: 忘记上线换技能
+    - :name: 炒货
+      :good: 水硼砂我会乱说？
+      :bad: 还轮得到你么
+    - :name: 刷A/B站
+      :good: 专注新番三十年
+      :bad: 切回来就只剩蛋了
+    - :name: 刷ECF
+      :good: 主席夸我政工强！
+      :bad: 切回来就只剩蛋了

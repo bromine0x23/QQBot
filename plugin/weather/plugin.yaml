@@ -1,0 +1,27 @@
+---
+? !ruby/symbol name
+: 天气插件
+? !ruby/symbol description
+: 我仔细一看天上下的是狗不理包子~
+? !ruby/symbol manual
+: |-
+  天气 <城市>
+  <城市> 天气
+? !ruby/symbol priority
+: 0
+? !ruby/symbol enable
+: true
+? !ruby/symbol display
+: ? !ruby/symbol index
+  : "%{title}: %{index}"
+  ? !ruby/symbol weather
+  : "%{date}: %{weather}, %{temperature}, %{wind}"
+  ? !ruby/symbol weathers
+  : |-
+    %{city}, PM2.5: %{pm25}
+    %{weathers}
+    %{indices}
+  ? !ruby/symbol error
+  : 天气查询错误 %{message}(%{code})
+? !ruby/symbol client_id
+: # 百度开放云平台(http://developer.baidu.com/) API Key

@@ -1,0 +1,32 @@
+---
+? !ruby/symbol name
+: 核心插件
+? !ruby/symbol description
+: 这是人家重要的地方
+? !ruby/symbol manual
+: |-
+  插件列表
+  插件帮助 <插件>
+? !ruby/symbol priority
+: 200
+? !ruby/symbol enable
+: true
+? !ruby/symbol display
+: ? !ruby/symbol plugins_reloaded
+  : 插件已重载，共 %{count} 个插件
+  ? !ruby/symbol plugins_reloaded_failed
+  : 插件重载失败
+  ? !ruby/symbol plugin_enabled
+  : 插件 %{name} 已启用
+  ? !ruby/symbol plugin_disabled
+  : 插件 %{name} 已停用
+  ? !ruby/symbol plugin_help
+  : |-
+    ====> %{name} 帮助 <====
+    %{manual}
+  ? !ruby/symbol plugin_list
+  : |-
+    插件列表:
+    %{plugins}
+  ? !ruby/symbol unknown_plugin
+  : 未知插件 %{name}

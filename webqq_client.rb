@@ -111,18 +111,9 @@ class WebQQClient < HttpClient
 
 		# 腾讯迷の哈希，用于获取好友和群的uid等
 		def self.fetch(uin, ptwebqq)
-			r = ''
-			u = uin.to_s.bytes
-			ul, ui = u.size, 0
-			ptwebqq.each_byte do |p|
-				r += '%02X' % (u[ui] ^ p)
-				ui = (ui + 1) % ul
-			end
-			'password error'.each_byte do |p|
-				r += '%02X' % (u[ui] ^ p)
-				ui = (ui + 1) % ul
-			end
-			r
+			n = ptwebqq.bytes.each_with_index.reduce(Array.new(4, 0)){|array, byte_with_index| array[byte_with_index.last % 4] ^= byte_with_index.first; array }
+			v = 'ECOK'.bytes.each_with_index.map{|byte, index| (uin >> ((3 - index) << 3) & 255) ^ byte }
+			Array.new(8){|i|  i.even? ? n[i / 2] : v[i / 2] }.map!{|x| format('%02X', x) }.join
 		end
 	end
 
@@ -796,7 +787,7 @@ JSON Parser Error: #{response}
 			end
 		end
 
-		@entries_update = Concurrent::TimerTask.execute(execution: 7200, timeout: 60, now: true) do
+		@entries_update = Concurrent::TimerTask.execute(execution: 3600, timeout: 60, now: true) do
 			groups_list.clear
 			get_group_list['gnamelist'].each{ |gname| groups_list[gname['gid']] = gname }
 
